@@ -1,0 +1,15 @@
+# 服务器端依赖（★ 不是 requirements.txt）
+#
+# 为什么单独一份：requirements.txt 里的 pywebview / pyinstaller 只有**桌面壳与打包**才需要，
+# 在无图形界面的 Linux 上装 pywebview 会去拉 GTK/WebKit 那一堆东西（还可能直接装不上）。
+# 服务器只跑 FastAPI 后端，这四行就够。
+fastapi>=0.110
+uvicorn>=0.29
+httpx>=0.27
+pymysql>=1.1
+
+# ★ 只有连 **MySQL 8 的 caching_sha2_password**（默认认证插件）时才需要它；
+#   连 MariaDB / MySQL 5.7（mysql_native_password）用不上，但装着无害。
+#   少了它，连 MySQL 8 会报 "cryptography package is required for sha256_password
+#   or caching_sha2_password auth methods"。
+cryptography>=42

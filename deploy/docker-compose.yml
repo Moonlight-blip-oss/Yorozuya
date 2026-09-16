@@ -1,0 +1,81 @@
+# Yorozuya 一键部署：app（FastAPI）+ db（MySQL）+ caddy（HTTPS）
+#
+#   ★ 最省事：在服务器上跑
+#       bash deploy/install.sh
+#     它会装 Docker、按你的域名生成 .env、起服务，并帮你建第一个账号。
+#
+#   手动做的话：
+#     1) cp deploy/.env.example deploy/.env 并填好（SITE_ADDRESS / PUBLIC_URL / 两个密码）
+#     2) 有域名：A 记录指向本机，安全组放行 80 与 443
+#     3) cd deploy && docker compose up -d --build
+#     4) 建账号（默认关着注册）：
+#          curl -s https://你的域名/api/auth/register -H 'Content-Type: application/json' \
+#               -d '{"username":"yorozuya","password":"你的密码"}'
+#
+# 数据落在两个具名卷里（db-data / app-data），删容器不丢数据。
+
+services:
+  db:
+    image: mysql:8.4
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在 deploy/.env 里设置}
+      MYSQL_DATABASE: zhiban
+      MYSQL_USER: yorozuya
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请在 deploy/.env 里设置}
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    # ★ 故意不写 ports：数据库只在 compose 内网里，公网连不到
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    environment:
+      # 数据库走环境变量（db.py / agent 内核都认这套 ZHIBAN_DB_*），不放 db_config.json
+      ZHIBAN_DB_HOST: db
+      ZHIBAN_DB_PORT: "3306"
+      ZHIBAN_DB_USER: yorozuya
+      ZHIBAN_DB_PASS: ${MYSQL_PASSWORD}
+      ZHIBAN_DB_NAME: zhiban
+      # ★ 公网收紧三件套：只放行自己的站点地址、关掉公开注册与访客
+      #   第一个账号怎么建：见本文件顶部第 4 条
+      YOROZUYA_CORS_ORIGINS: ${PUBLIC_URL:?请在 deploy/.env 里设置}
+      YOROZUYA_ALLOW_REGISTER: "0"
+      YOROZUYA_ALLOW_GUEST: "0"
+    volumes:
+      - app-data:/srv/yorozuya/appdata
+    # 只绑回环：留给本机排查/建账号用（curl 127.0.0.1:8902），公网访问不到
+    ports:
+      - "127.0.0.1:8902:8902"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?请在 deploy/.env 里设置}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  app-data:
+  caddy-data:
+  caddy-config:

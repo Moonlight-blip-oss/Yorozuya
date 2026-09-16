@@ -1,0 +1,22 @@
+# Caddy：站点地址由 .env 里的 SITE_ADDRESS 决定，改完 docker compose up -d 即可
+#   有域名   → SITE_ADDRESS=yorozuya.example.com   （自动申请并续期 Let's Encrypt 证书）
+#   只用 IP  → SITE_ADDRESS=:80                    （先跑通，没有 HTTPS）
+# 前提：有域名时，A 记录要指向这台服务器，且 80/443 都放行（ACME 校验要用 80）
+
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	# 反代到 compose 内网的 app 容器（uvicorn :8902）
+	reverse_proxy app:8902
+
+	# 附件上传默认上限 8MB（见 yorozuya/files.py），给点余量
+	request_body {
+		max_size 12MB
+	}
+
+	header {
+		# 单机自用应用：别被搜索引擎收录
+		X-Robots-Tag "noindex, nofollow"
+		-Server
+	}
+}

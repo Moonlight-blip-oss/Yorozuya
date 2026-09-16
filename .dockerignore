@@ -1,0 +1,12 @@
+# Docker 构建上下文 = 项目根；把不该进镜像的东西挡掉（镜像只装 app/ yorozuya/ renderer/ icon/）
+.git
+.idea
+.venv
+appdata
+build
+deploy/.env
+*.exe
+*.spec
+*.log
+*.md
+db_config.json
