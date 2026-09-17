@@ -4,7 +4,7 @@ Yorozuya 是一个支持角色对话、记忆、待办和工程任务的 AI 助�
 
 - 网站入口：[yorozuya.fun](https://yorozuya.fun)
 - 源码仓库：[Moonlight-blip-oss/Yorozuya](https://github.com/Moonlight-blip-oss/Yorozuya)
-
+本项目仅用作展示和学习交流
 ## 功能特色
 
 Yorozuya 把「陪伴」和「干活」放在同一个界面里：聊天侧负责角色、记忆与待办，工作台侧负责在你自己的机器上处理真实项目。
