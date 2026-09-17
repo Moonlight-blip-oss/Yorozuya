@@ -9,9 +9,29 @@
 > 这份 README 是**唯一**的文档：原来 `docs/` 下的分册与 `CHANGELOG.md` 都已删除
 > （`docs/` 留了一份备份 zip 在项目外），内容该并进 README 的都并进来了。
 
+## ★ 这个项目有两份，改之前先确认是哪一份（2026-09-17）
+
+| 位置 | 身份 |
+|---|---|
+| `D:\DeskTop\Yorozuya` | **正本** —— 有 `.git`、有日常运行的 `Yorozuya.exe`、部署包也从这里出 |
+| `F:\WorkBuddy Files\Yorozuya` | WorkBuddy 打开的工作副本 |
+
+**踩过的坑**：在副本里改完文案 + 重打包副本的 exe，正本这边当然一动不动 ——
+界面上还是旧字，会误判成「改了没生效」而去查缓存、查构建号，其实**从头到尾查错了目录**。
+
+两份从 2026-09-16 22:37 起分叉：正本有 `app/server.py`、`renderer/agent.js`、`renderer/style.css`、
+`yorozuya/agent/snapshot.py` 那一批改动，副本没有。**行尾也不一样**：正本的 `index.html` 与
+`locales/*.json` 是 CRLF，副本被写成了 LF。
+
+两条规矩：
+
+- **改动只在正本做**。给别人同步时逐条文本替换，**不要整目录覆盖** —— 会把对方独有的改动抹掉。
+- 改完 `renderer/` 下任何东西，**顺手改 `yorozuya/common.py` 的 `BUILD_STAMP`**，再重打包；
+  号不变就分不出新旧（「账号状态 → 客户端版本」是判断这事最快的办法）。
+
 ## 运行
 
-### 方式一：双击 exe（推荐，免安装）
+### 方式一：双击 exe
 
 打包产物 **`Yorozuya.exe`（就在项目根）**——单文件、无黑框，双击即弹桌面窗口。
 
@@ -87,14 +107,103 @@ cd deploy && docker compose up -d --build
 # 5) 建你自己的账号（★ 默认关着注册，所以用命令建；用户名 2-20 位、密码 6-64 位）
 curl -s https://你的域名/api/auth/register -H 'Content-Type: application/json' \
      -d '{"username":"yorozuya","password":"你的密码"}'
-#    想改成浏览器注册：临时把 compose 里的 YOROZUYA_ALLOW_REGISTER 改成 "1"
-#    → docker compose up -d app → 注册 → 再改回 "0" → 再 up -d app
+#    注册默认是关的。要建号或临时开注册：在 deploy/.env 里加一行 ALLOW_REGISTER=1
+#    → docker compose up -d app → 注册 → 删掉那行（或改成 0）→ 再 up -d app
+#    （不用手改 compose；install.sh 会自动做「临时开 → 建号 → 立刻关回」）
 ```
 
 - 数据落在两个具名卷：`db-data`（MySQL）、`app-data`（`appdata/` 上传附件与 agent 快照）
 - 数据与**你本机那份完全独立**（服务器是它自己的 MySQL），本机的聊天记录不会自动同步过去
 - 备份 = `docker compose exec db sh -c 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" zhiban' > zhiban.sql` ＋ 备份 `app-data` 卷
 - 数据库**没有**对外映射端口，只在 compose 内网里
+
+### ★ 国内服务器部署实录（2026-09-17 · 阿里云 2C2G / Alibaba Cloud Linux 3）
+
+一次真实部署踩到的三个点，**都已在仓库里修好**：
+
+| 现象 | 根因 | 处置 |
+|---|---|---|
+| 拉 `mysql:8.4` 报 `registry-1.docker.io … Client.Timeout`（caddy 却拉成功了） | 服务器自带阿里云加速器对 `mysql:8.4` **未命中缓存** → 回源 Docker Hub；而 Docker Hub 在国内直连不通 | `/etc/docker/daemon.json` 的 `registry-mirrors` **追加**（不是覆盖）`https://docker.m.daocloud.io` —— 实测返回 401（= 正常响应、源可用），重启 docker 后 813MB 镜像顺利拉下 |
+| 构建镜像**静默卡死**十几分钟，日志停在 `Get:4 …/Packages [9678 kB]`，mtime 一动不动 | `python:3.12-slim` 里的 `deb.debian.org` 在国内**连得上但下不动**（直接 curl 完全无响应） | `deploy/Dockerfile` 已把 apt 源换成 `mirrors.aliyun.com`（实测 597KB/s），pip 加 `-i https://mirrors.aliyun.com/pypi/simple/` |
+| `install.sh` 建号报 `{"error":"本服务器已关闭注册"}` | compose 里 `YOROZUYA_ALLOW_REGISTER` **写死 `"0"`**，而建号走的正是 `/api/auth/register` → 必然建不上；脚本只 warn 一句，很容易被当成"建好了" | compose 改为 `${ALLOW_REGISTER:-0}`（默认仍关）；`install.sh` 改成**临时开 → 建号 → 立刻关回**；收尾提示里的建号命令也修正了（原命令在关注册下必失败） |
+
+顺带两点，**不是问题、别去改**：
+
+- Alibaba Cloud Linux 3 是 RHEL 系（`dnf`，没有 `apt-get`），但 `install.sh` 只在**缺 curl** 时才调 apt —— curl 是预装的，所以这个不匹配不会触发。
+- 它检查 `ufw`，这台机器用的是 firewalld（当时未运行），同样安全跳过。
+
+实测结果（公网放行前，走本机回环验证）：
+
+```
+/api/agent/status          → 401（服务活着，只是没带 token）
+renderer/app.js 文案        → 数据保存在你的账号（云端 MySQL）
+app.js?v=                   → 2026-09-17.1120
+POST /api/auth/register     → 403（公网收紧生效）
+经 Caddy 访问 /             → 200
+数据库表                     → chats conversations memories sessions todos user_settings user_stats users（首次启动自动建好）
+```
+
+⚠️ **部署完还差最后一步：云控制台安全组放行 80/443**（入方向，来源 `0.0.0.0/0`）。
+没放行时服务在服务器内部一切正常（`curl 127.0.0.1` 200），但**公网访问不到** —— 别误判成部署失败。
+（2026-09-17 已放行：ECS 控制台 → 实例 → 安全组 → **管理规则** → 入方向 → **快速添加规则** → 勾 Web HTTP/HTTPS。）
+
+### ★ HTTPS 已上线（2026-09-17）
+
+域名 **`yorozuya.fun`**（阿里云注册）→ A 记录 `@` → `47.110.90.19`。
+改 `deploy/.env` 的 `DOMAIN` / `SITE_ADDRESS` / `PUBLIC_URL` 三行 → `docker compose up -d`，
+Caddy 自动完成 ACME HTTP-01 校验并签发证书（日志关键字 `certificate obtained successfully`）。
+
+```
+https://yorozuya.fun   → 200；证书 CN=yorozuya.fun · Let's Encrypt · 90 天（到期前自动续期）· TLSv1.3
+http://yorozuya.fun    → 308 Permanent Redirect → https://yorozuya.fun/
+```
+
+⚠️ **两个"看着像坏了其实没坏"**：
+
+- `curl -I https://yorozuya.fun` 返回 **404** 是正常的 —— 应用的路由只支持 GET，而 `-I` 发的是 HEAD。**要看 GET**。
+- 上了域名之后**用 IP 访问会失效**（Caddy 只服务 `SITE_ADDRESS` 这一个地址），这是预期行为。
+
+⚠️ **顺序不能反**：必须**先让域名解析生效**（`nslookup 你的域名` 能查出服务器 IP），**再**重启容器。
+反过来做的话，SITE_ADDRESS 已经变成域名、而 ACME 又解析不到本机，会**域名和 IP 两头都进不去**。
+（域名侧还有两个前置：NS 要指向注册商分配的 DNS 服务器、国内域名要**实名认证通过**，否则记录加了也不生效。）
+
+### ★ 这个部署现在是「展示站」（2026-09-17 定）
+
+站点公网可达（`http://47.110.90.19`），但**只做展示**、不承担实际使用：
+
+| 开关 | 值 | 效果 |
+|---|---|---|
+| `ALLOW_REGISTER` | 缺省 = `0` | 陌生人注册不进来（`POST /api/auth/register` → **403**） |
+| `ALLOW_GUEST` | **`1`** | 点「不登录，先逛逛」即可体验：**一个字节都不写库**；工作台对访客一律拒绝 |
+
+实测：
+```
+GET  /                        → 200（无门禁）
+POST /api/auth/guest          → 200，拿到 guest:… token
+POST /api/auth/register       → 403（已关闭）
+GET  /api/state（访客）        → 200（只能看自己）
+POST /api/agent/run（访客）    → 403 ← 关键：访客跑不了工作台
+```
+
+### ★ 曾经加过又撤掉的一层门禁（写在这里，需要时照着加回来）
+
+2026-09-17 上午曾给全站加过 **Basic Auth**（`basicauth`，凭据只存 bcrypt 哈希不落盘），
+同日下午因为站点改成纯展示而撤掉。**Caddyfile 里留了注释和写法**，随时能加回来。
+
+⚠️ **什么时候必须加回来**：把站点恢复成「能真正使用」的形态时 —— 也就是**开放注册**、
+或**允许登录用户使用工作台**。因为工作台是能在服务器上**真执行命令**的，而 IP 公网可达，
+没有门禁等于把服务器交出去。
+
+```bash
+# 加回来的步骤
+docker exec deploy-caddy-1 caddy hash-password --plaintext '你的密码'   # 生成哈希
+# 把 basicauth { 用户名 <哈希> } 写进 deploy/Caddyfile（v2.4~v2.7 用 basicauth；v2.8+ 改叫 basic_auth）
+docker exec deploy-caddy-1 caddy validate --config /etc/caddy/Caddyfile   # ★ 先验语法再重启
+cd deploy && docker compose restart caddy
+# 验证：无凭据 curl -I http://<地址>/ → 401；带 -u 用户:密码 → 200
+```
+
+> 这台机器的 Caddy 是 **v2.4.6**（老），所以指令名用 `basicauth`；升到 2.8+ 要改成 `basic_auth`。
 
 ### 方案 B：不用 Docker（venv + systemd + Caddy/Nginx）
 

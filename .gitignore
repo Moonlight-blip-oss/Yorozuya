@@ -29,3 +29,19 @@ dist/
 .mypy_cache/
 .coverage
 htmlcov/
+
+# Deployment archives and local backups
+/Yorozuya-server*.tar.gz
+*.bak
+*.tmp
+
+# Local databases and private key files
+*.sqlite
+*.sqlite3
+*.db
+*.pem
+*.key
+
+# Operating system metadata
+.DS_Store
+Thumbs.db

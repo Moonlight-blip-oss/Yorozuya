@@ -437,7 +437,7 @@ pre{{margin-top:14px;padding:10px 14px;background:#f1ebe0;border-radius:10px;fon
 <p>Yorozuya 需要在本机起一个本地服务。请检查：</p>
 <p>① 8902 / 8904-8906 端口是否被其它程序占用<br>
    ② 数据库配置 <b>db_config.json</b> 是否在项目根（与 app/ 同级）<br>
-   ③ 本机 MySQL / MariaDB 是否已启动</p>
+   ③ 云端 MySQL / MariaDB 是否可连接（db_config.json 账号正确、网络可达）</p>
 <pre>{d}</pre>
 </body></html>"""
 

@@ -45,10 +45,14 @@ services:
       ZHIBAN_DB_PASS: ${MYSQL_PASSWORD}
       ZHIBAN_DB_NAME: zhiban
       # ★ 公网收紧三件套：只放行自己的站点地址、关掉公开注册与访客
-      #   第一个账号怎么建：见本文件顶部第 4 条
+      #   ★ 2026-09-17 改：注册/访客改成**可用 .env 开关**（默认仍关着，安全性不变）。
+      #   原因：原来这里硬编码 "0"，而 install.sh 建第一个账号走的就是 /api/auth/register
+      #   —— 结果必然是「本服务器已关闭注册」，号根本建不上（脚本只 warn 不报错，容易被忽略）。
+      #   现在想建号：在 deploy/.env 写 ALLOW_REGISTER=1 → docker compose up -d app
+      #   → 建号 → 把 1 改回 0（或删掉这行）→ docker compose up -d app。
       YOROZUYA_CORS_ORIGINS: ${PUBLIC_URL:?请在 deploy/.env 里设置}
-      YOROZUYA_ALLOW_REGISTER: "0"
-      YOROZUYA_ALLOW_GUEST: "0"
+      YOROZUYA_ALLOW_REGISTER: ${ALLOW_REGISTER:-0}
+      YOROZUYA_ALLOW_GUEST: ${ALLOW_GUEST:-0}
     volumes:
       - app-data:/srv/yorozuya/appdata
     # 只绑回环：留给本机排查/建账号用（curl 127.0.0.1:8902），公网访问不到

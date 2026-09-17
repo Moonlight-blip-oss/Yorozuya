@@ -6,6 +6,16 @@
 {$SITE_ADDRESS} {
 	encode zstd gzip
 
+	# ★ 这里原本有一层全站 Basic Auth 门禁（2026-09-17 加过，同日按用户要求撤掉）。
+	#   撤掉的原因：**这个站点只做展示** —— 注册关闭、只开访客模式
+	#   （免注册进入、一个字节都不写库、工作台对访客一律拒绝），所以不必再把整站锁起来。
+	#   ⚠️ 哪天要把它当"真能用"的站点（开放注册 / 允许登录用户用工作台），
+	#      必须把这层门禁加回来 —— 工作台是能在服务器上**真执行命令**的。
+	#   加回来的写法（注意指令名随版本变：v2.4~v2.7 是 basicauth，v2.8+ 改成 basic_auth）：
+	#     basicauth {
+	#       用户名 <bcrypt哈希>     # docker exec deploy-caddy-1 caddy hash-password --plaintext '密码'
+	#     }
+
 	# 反代到 compose 内网的 app 容器（uvicorn :8902）
 	reverse_proxy app:8902
 

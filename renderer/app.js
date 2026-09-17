@@ -132,10 +132,12 @@ async function becomeGuest(silent) {
     await enterApp();
     if (!silent) toast(T("访客模式已开启"), T("随便聊，不用注册。记忆功能处于关闭状态。"));
   } catch (err) {
-    const inPreview = !location.hostname.match(/^(127\.0\.0\.1|localhost)$/);
-    $("#gateErr").innerHTML = inPreview
-      ? T("当前处于预览代理环境，无法访问本地后端。<b>请复制此地址到浏览器打开：</b>http://127.0.0.1:8903")
-      : T("无法连接服务器：") + err.message;
+    // ★ 2026-09-17 修：原来这里按「hostname 不是 127.0.0.1/localhost」判定"预览代理环境"，
+    //   提示去打开 http://127.0.0.1:8903（连端口都是硬编码的）。部署到公网后 hostname 就是
+    //   域名/IP，于是**服务端只要有一次请求异常，就会弹出这个与站点毫无关系的本机地址**，
+    //   把人指到本机去 —— 2026-09-17 在阿里云那台上真实发生过。
+    //   改为如实报错：err.message 本身就足够区分"连不上"和"服务端报错"。
+    $("#gateErr").textContent = T("无法连接服务器：") + err.message;
   }
 }
 
@@ -199,10 +201,9 @@ function bindGate() {
       toast(mode === "login" ? T("欢迎回来") : T("注册成功"),
         mode === "login" ? T("哟，又来了啊。") : T("新账号已就绪，开始你们的故事吧。"));
     } catch (err) {
-      const inPreview = !location.hostname.match(/^(127\.0\.0\.1|localhost)$/);
-      errEl.innerHTML = inPreview
-        ? T("当前处于预览代理环境，无法访问本地后端。<b>请复制此地址到浏览器打开：</b>http://127.0.0.1:8903")
-        : T("无法连接服务器：") + err.message;
+      // ★ 2026-09-17 修：与 becomeGuest 同一处问题（见上面的注释）——
+      //   别再把"非本机 hostname"当成预览代理环境，如实报错。
+      errEl.textContent = T("无法连接服务器：") + err.message;
     } finally {
       $("#gateSubmit").disabled = false;
     }
@@ -367,7 +368,7 @@ function updateModeHint() {
     return;
   }
   el.textContent = S.settings.hasKey
-    ? T("已连接：{model} · 记忆自动沉淀{state} · 数据保存在你的账号（本机 MySQL）",
+    ? T("已连接：{model} · 记忆自动沉淀{state} · 数据保存在你的账号（云端 MySQL）",
         { model: S.settings.model, state: S.settings.autoExtract ? T("已开启") : T("已关闭") })
     : T("演示模式：未配置 API Key，回复由后端本地生成 · 前往设置页填入接口即可使用真实模型");
 }
@@ -1293,7 +1294,7 @@ function renderAccount() {
   ];
   const wide = IS_GUEST
     ? T("数据存储：仅保存在服务器内存中，关闭页面或重启服务即清空（注册账号后可持久保存）")
-    : T("数据存储：本机 MySQL 的 zhiban 库 · 密码以 PBKDF2-HMAC-SHA256 加盐哈希保存，不存明文");
+    : T("数据存储：云端 MySQL 数据库 · 密码以 PBKDF2-HMAC-SHA256 加盐哈希保存，不存明文");
   $("#acctGrid").innerHTML =
     rows.map(([k, v]) => `<div class="acct-item"><span>${k}</span><b>${v}</b></div>`).join("")
     + `<div class="acct-item wide"><span>${wide}</span></div>`;

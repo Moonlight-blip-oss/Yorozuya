@@ -345,7 +345,7 @@
             <section class="sm-section" data-section="agreement">
               <h3 class="sm-h" data-i18n="服务协议">服务协议</h3>
               <div class="agreement-body">
-                <p data-i18n="Yorozuya 是一款完全在本机运行的 AI 陪伴助手，数据保存在你的设备（本机 MySQL 的 zhiban 库），我们不会上传你的对话、记忆或待办。">Yorozuya 是一款完全在本机运行的 AI 陪伴助手，数据保存在你的设备（本机 MySQL 的 zhiban 库），我们不会上传你的对话、记忆或待办。</p>
+                <p data-i18n="Yorozuya 是一款 AI 陪伴助手，你的对话、记忆、待办与账号数据保存在云端数据库（MySQL）中，更换设备或重装后登录同一账号即可继续使用；数据全程通过 HTTPS 加密传输，不会向第三方共享。">Yorozuya 是一款 AI 陪伴助手，你的对话、记忆、待办与账号数据保存在云端数据库（MySQL）中，更换设备或重装后登录同一账号即可继续使用；数据全程通过 HTTPS 加密传输，不会向第三方共享。</p>
                 <p data-i18n="· 访客模式可免注册体验，但不保存任何记忆，关闭页面即清空。">· 访客模式可免注册体验，但不保存任何记忆，关闭页面即清空。</p>
                 <p data-i18n="· 注册账号后，对话、记忆、待办与成长记录会按账号隔离持久保存；密码以 PBKDF2-HMAC-SHA256 加盐哈希存储，不存明文。">· 注册账号后，对话、记忆、待办与成长记录会按账号隔离持久保存；密码以 PBKDF2-HMAC-SHA256 加盐哈希存储，不存明文。</p>
                 <p data-i18n="· 模型接口需你自备兼容 OpenAI 的 API Key；留空则使用内置演示模式（能力有限）。">· 模型接口需你自备兼容 OpenAI 的 API Key；留空则使用内置演示模式（能力有限）。</p>
@@ -390,7 +390,7 @@
       <p class="gate-err" id="gateErr"></p>
       <div class="gate-divider"><span data-i18n="或者">或者</span></div>
       <button id="gateGuest" class="ghost-btn gate-guest" type="button" data-i18n="不登录，先逛逛（访客模式）">不登录，先逛逛（访客模式）</button>
-      <p class="gate-tip" data-i18n-html="数据保存在本机 MySQL，账号之间互不可见<br>访客模式免注册即可体验，但不保存记忆">数据保存在本机 MySQL，账号之间互不可见<br>访客模式免注册即可体验，但不保存记忆</p>
+      <p class="gate-tip" data-i18n-html="数据保存在云端数据库（MySQL），账号之间互不可见<br>访客模式免注册即可体验，但不保存记忆">数据保存在云端数据库（MySQL），账号之间互不可见<br>访客模式免注册即可体验，但不保存记忆</p>
     </div>
   </div>
 
@@ -408,7 +408,7 @@
           <li data-i18n="未登录是「访客模式」：能聊天、能用待办，但不保存记忆，关页即清空。">未登录是「访客模式」：能聊天、能用待办，但不保存记忆，关页即清空。</li>
         </ul>
         <p><b data-i18n="反馈">反馈</b></p>
-        <p class="muted small" data-i18n="遇到问题或想加功能，直接告诉开发者即可。本应用完全在本机运行，数据保存在你自己的 MySQL。">遇到问题或想加功能，直接告诉开发者即可。本应用完全在本机运行，数据保存在你自己的 MySQL。</p>
+        <p class="muted small" data-i18n="遇到问题或想加功能，直接告诉开发者即可。你的数据保存在云端数据库（MySQL），全程 HTTPS 加密传输。">遇到问题或想加功能，直接告诉开发者即可。你的数据保存在云端数据库（MySQL），全程 HTTPS 加密传输。</p>
       </div>
       <button class="primary-btn gate-submit" id="btnHelpClose" type="button" data-i18n="知道了">知道了</button>
     </div>
@@ -435,6 +435,28 @@
 <aside id="workbench" hidden role="dialog" aria-modal="true" aria-label="工作台抽屉" data-i18n-aria="工作台抽屉">
   <div class="wb-host" data-wb-host="drawer"></div>
 </aside>
+
+<!-- file:// 兜底提示（2026-09-17 加）：本页所有请求都是相对路径（fetch("/api/…")），
+     必须由后端同源提供。双击打开时浏览器按 file:// 解析，请求会变成 file:///api/…
+     而发不出去 —— 表现出来就是「页面出来了但按钮点了没反应」，很容易被当成 bug。
+     与其让人对着白屏猜，不如直接把正确的入口写出来。正常 http(s) 下这段不执行。 -->
+<script>
+(function () {
+  if (location.protocol !== "file:") return;
+  var box = document.createElement("div");
+  box.style.cssText = "position:relative;z-index:9999;margin:0;padding:14px 18px;" +
+    "background:#FCEBEB;color:#501313;border-bottom:1px solid #A32D2D;" +
+    "font:14px/1.7 system-ui,-apple-system,'Segoe UI',sans-serif";
+  box.innerHTML =
+    "<strong>这个页面不能双击打开</strong><br>" +
+    "它所有请求都是相对路径（<code>/api/…</code>），必须由后端同源提供；" +
+    "现在这些请求会变成 <code>file:///api/…</code>，所以按钮点了没反应。<br>" +
+    "请改用：<strong>双击 Yorozuya.exe</strong>（或项目根的 <code>启动万事屋.bat</code>），" +
+    "或跑 <code>.venv\\Scripts\\python.exe app\\server.py</code> 后访问 " +
+    "<code>http://127.0.0.1:8902</code>。";
+  document.body.insertBefore(box, document.body.firstChild);
+})();
+</script>
 
 <!-- i18n 要最先加载：后面的模块里 T() 随时可能被调用 -->
 <script src="i18n.js?v=__BUILD__"></script>

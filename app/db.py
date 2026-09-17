@@ -84,7 +84,14 @@ def _connect(with_db=True):
     cfg = get_config()
     kw = dict(host=cfg["host"], port=int(cfg["port"]), user=cfg["user"],
               password=cfg["password"], charset="utf8mb4",
-              autocommit=True, cursorclass=pymysql.cursors.DictCursor)
+              autocommit=True, cursorclass=pymysql.cursors.DictCursor,
+              # ★ 三个超时（2026-09-17 加）：只要数据库不在本机（Docker 内网的 db 容器，
+              #   或以后换成云端 MySQL），网络不通/对端还没起来时 pymysql 默认**无限等**，
+              #   表现成整个接口挂住、看着像应用死了，而且日志里什么都没有。
+              #   给了超时才会变成一句能看懂的报错。
+              #   connect 8s：内网通常 <1s，跨公网也够；读写 60s —— 本项目查询都很小，
+              #   这个值只是防止"连接被中间设备悄悄掐掉之后一直挂着"。
+              connect_timeout=8, read_timeout=60, write_timeout=60)
     if with_db:
         kw["database"] = cfg["database"]
     return pymysql.connect(**kw)

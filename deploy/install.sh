@@ -114,6 +114,10 @@ ok "后端已就绪"
 docker compose ps
 
 # ---------------- 6. 建第一个账号 ----------------
+# ★ 注册默认是关着的（公网收紧），所以要**临时打开 → 建号 → 立刻关回去**。
+#   2026-09-17 修：原来这里直接 POST /api/auth/register，而 compose 里
+#   YOROZUYA_ALLOW_REGISTER 写死 "0"，结果必然是「本服务器已关闭注册」——
+#   账号永远建不上，脚本却只 warn 一句，很容易被当成"建好了"。
 say "建你的账号（用户名 2-20 位中英文数字下划线；密码 6-64 位）"
 printf '用户名（直接回车 = 跳过，稍后按最后打印的命令自己建）: '
 read -r USERNAME || true
@@ -123,11 +127,21 @@ if [ -n "$USERNAME" ]; then
   if [ -z "$PASSWORD" ]; then
     warn "密码空着，跳过建号"
   else
+    say "临时打开注册（建完立刻关回去）"
+    printf 'ALLOW_REGISTER=1\n' >> "$HERE/.env"
+    docker compose up -d app >/dev/null 2>&1 || true
+    for i in $(seq 1 20); do
+      code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://127.0.0.1:8902/api/agent/status || true)"
+      if [ "$code" = "401" ] || [ "$code" = "200" ]; then break; fi
+      sleep 2
+    done
     RESP="$(curl -sS -X POST http://127.0.0.1:8902/api/auth/register \
               -H 'Content-Type: application/json' \
               -d "{\"username\":\"$USERNAME\",\"password\":\"$PASSWORD\"}" || true)"
+    sed -i '/^ALLOW_REGISTER=/d' "$HERE/.env"
+    docker compose up -d app >/dev/null 2>&1 || true
     case "$RESP" in
-      *token*) ok "账号已建好：$USERNAME" ;;
+      *token*) ok "账号已建好：$USERNAME（注册已重新关闭）" ;;
       *)       warn "建号返回：$RESP（用户名被占用/密码太短之类，按提示改了重跑本脚本即可）" ;;
     esac
   fi
@@ -143,12 +157,14 @@ cat <<EOF
  登录：   用刚建的账号（用户名 $USERNAME 或你自己建的那个）
  必做①    登录后进「设置」填你的模型接口（apiUrl / apiKey / 模型名），
           不填就是演示模式（本地语料回复，不调模型）
- 必做②    确认注册/访客已关闭（应当都返回 403）：
-          curl -s -o /dev/null -w '%{http_code}\n' -X POST $VISIT/api/auth/register \\
+ 必做②    确认注册/访客已关闭（应当都返回 403；用回环地址探，不依赖公网有没有放行）：
+          curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:8902/api/auth/register \\
                -H 'Content-Type: application/json' -d '{"username":"x","password":"123456"}'
- 没建号   curl -s -X POST $VISIT/api/auth/register \\
-             -H 'Content-Type: application/json' \\
-             -d '{"username":"yorozuya","password":"你的密码"}'
+ 没建号   注册默认关着，要先临时打开、建完再关回去（三条命令，都在 $HERE 下跑）：
+          echo ALLOW_REGISTER=1 >> .env && docker compose up -d app && sleep 6
+          curl -s -X POST http://127.0.0.1:8902/api/auth/register \\
+               -H 'Content-Type: application/json' -d '{"username":"yorozuya","password":"你的密码"}'
+          sed -i '/^ALLOW_REGISTER=/d' .env && docker compose up -d app
 ---------------------------------------------------------------------
  常用命令（都在 $HERE 下跑）：
    docker compose logs -f app     看后端日志
