@@ -1,1104 +1,219 @@
-# Yorozuya（Python 版）· 万事屋桌面助手
+# Yorozuya · 万事屋使用说明
 
-**核心逻辑 100% Python**（FastAPI），账号体系与数据持久化基于 **MySQL**，前端仅作展示层，桌面端用 pywebview 包壳。
+Yorozuya 是一个支持角色对话、记忆、待办和工程任务的 AI 助手。你可以选择银时、神乐、新八或小玉陪伴聊天，也可以在工作台中处理自己的项目。
 
-四位成员 **银时 / 神乐 / 新八 / 小玉** 之间切换；支持免登录访客模式（不保存记忆）；**125 枚**里程碑成就（7 组）+ Steam 风格解锁弹窗；等级上限 Lv.20；支持 LLM **工具调用**（记忆/待办/时间等 9 个工具）与**思考过程**流式展示。
+- 网站入口：[yorozuya.fun](https://yorozuya.fun)
+- 源码仓库：[Moonlight-blip-oss/Yorozuya](https://github.com/Moonlight-blip-oss/Yorozuya)
 
-在陪伴之外还有**第二面**：内置一个本机编码 Agent 内核（`yorozuya/agent/`）——「工作台」里可以把活派给它（读文件 / 改文件 / 跑命令 / 跑测试 / 派只读子代理 / 调 MCP 工具 / 待办直接派活），改完必须**自己跑验证命令**证明，见「工作台（工程委托 · M2 界面 / M3 能力 / 待办直通 / 验证命令）」一节。
+## 1. 选择使用方式
 
-> 这份 README 是**唯一**的文档：原来 `docs/` 下的分册与 `CHANGELOG.md` 都已删除
-> （`docs/` 留了一份备份 zip 在项目外），内容该并进 README 的都并进来了。
+| 你的需求 | 使用方式 | 需要准备 |
+| --- | --- | --- |
+| 先看看界面和互动效果 | 网站访客模式 | 浏览器，且站点已开放访客入口 |
+| 保存聊天、记忆和待办，接入真实模型 | 登录可用的服务，或自行部署 | 账号、模型 API 地址、API Key 和模型名称 |
+| 让工作台处理电脑上的项目 | 在自己的电脑上运行 | Python、MySQL、项目目录和模型配置 |
+| 在自己的服务器上使用 | Docker Compose 部署 | Linux 服务器、域名和 Docker Compose |
 
-## ★ 这个项目有两份，改之前先确认是哪一份（2026-09-17）
+网站以展示体验为主，注册与访客入口是否开放由管理员配置。如果提示注册已关闭，需要联系管理员获取账号，或按下文自行运行。
 
-| 位置 | 身份 |
-|---|---|
-| `D:\DeskTop\Yorozuya` | **正本** —— 有 `.git`、有日常运行的 `Yorozuya.exe`、部署包也从这里出 |
-| `F:\WorkBuddy Files\Yorozuya` | WorkBuddy 打开的工作副本 |
+## 2. 第一次使用
 
-**踩过的坑**：在副本里改完文案 + 重打包副本的 exe，正本这边当然一动不动 ——
-界面上还是旧字，会误判成「改了没生效」而去查缓存、查构建号，其实**从头到尾查错了目录**。
+1. 打开网站或本地服务页面。
+2. 有账号时选择「登录」；服务开放注册时，可以先创建账号。
+3. 只想体验时，点击「不登录，先逛逛（访客模式）」。
+4. 在对话页顶部选择成员，输入内容并发送。
+5. 登录后，按下一节配置模型，即可使用真实 AI 回复。
 
-两份从 2026-09-16 22:37 起分叉：正本有 `app/server.py`、`renderer/agent.js`、`renderer/style.css`、
-`yorozuya/agent/snapshot.py` 那一批改动，副本没有。**行尾也不一样**：正本的 `index.html` 与
-`locales/*.json` 是 CRLF，副本被写成了 LF。
+访客使用演示回复，对话和记忆不会持久保存，也不能执行工作台任务。需要长期保存数据时，请使用账号登录。
 
-两条规矩：
+## 3. 配置 AI 模型
 
-- **改动只在正本做**。给别人同步时逐条文本替换，**不要整目录覆盖** —— 会把对方独有的改动抹掉。
-- 改完 `renderer/` 下任何东西，**顺手改 `yorozuya/common.py` 的 `BUILD_STAMP`**，再重打包；
-  号不变就分不出新旧（「账号状态 → 客户端版本」是判断这事最快的办法）。
+打开侧栏快捷面板中的「设置」，进入「账号管理」，找到「模型接口（OpenAI 兼容）」。
 
-## 运行
+| 字段 | 怎么填写 |
+| --- | --- |
+| API 地址 | 服务商提供的兼容接口基础地址，例如 `https://你的接口域名/v1` |
+| API Key | 该服务商为你签发的密钥 |
+| 模型名称 | 该接口实际支持的模型 ID，按服务商提供的名称填写 |
 
-### 方式一：双击 exe
+填写后点击「保存设置」，返回对话页发送一条消息验证。
 
-打包产物 **`Yorozuya.exe`（就在项目根）**——单文件、无黑框，双击即弹桌面窗口。
+- 首次未配置 API Key 时，对话使用本地演示回复，不会调用真实模型。
+- 已保存密钥后，编辑设置时将密钥栏留空表示保留原密钥。
+- 工具调用需要所选模型支持相应能力；可以在「通用设置 → AI 能力」中开启。
+- 模型调用由你填写的接口提供，额度与费用以对应服务商为准。
+- 模型设置保存在所登录服务的数据库中，只在你信任的服务上填写密钥。
 
-> ★ 前端 `renderer/index.html` **不能单独双击打开**：它所有请求都是相对路径（`fetch("/api/…")`），
-> 必须由后端**同源**提供。用 `file://` 打开时请求发不出去（会解析成 `file:///api/…`），
-> 于是「按钮点了没反应」。要么双击 `Yorozuya.exe`，要么跑 `app\desktop.py`。
+## 4. 日常功能
 
-- `db_config.json`（数据库连接配置）**统一放在项目根**（与 `app/` 同级）——exe 会从自己所在目录往上找项目根，所以**打包版和源码版读的是同一份配置**
-- 若没有该文件，会回退到环境变量 `ZHIBAN_DB_*`，再回退到默认值（127.0.0.1:3306 / root）
+### 角色对话
 
-重新打包（产物**落在项目根**，不建 `dist/`）：
+在对话页顶部切换银时、神乐、新八或小玉。可以在「设置 → 通用设置」中修改你的称呼、界面语言和外观主题。
 
-```bash
-cd zhiban-py
+### 记忆与待办
 
-# 推荐：一键脚本（先把旧包让位成 Yorozuya.prev.exe，打完自动拆包校验内嵌前端）
-build\verify\pack_exe.bat
+登录后，可以在记忆和待办页面查看、管理内容。开启工具调用并接入支持工具的模型后，也可以通过对话提出请求，例如：
 
-# 手动打（★ 先让位旧包，★ 不要加 --clean，★ --distpath . 让产物落在项目根）
-mv -f Yorozuya.exe Yorozuya.prev.exe
-"C:\Users\ASUS\.workbuddy\binaries\python\envs\default\Scripts\python.exe" -m PyInstaller --noconfirm --distpath . yorozuya.spec
+- 「记住我喜欢简短的回答。」
+- 「帮我添加一条待办：周五整理项目文档。」
+
+在「通用设置」中还可以控制是否自动提取对话记忆。
+
+### 数据备份
+
+打开「设置 → 数据管理」，使用「导出数据」保存备份，或使用「导入数据」迁移数据。
+
+清空数据前请先导出备份。清空会删除对话、记忆、待办与成长记录；是否同时删除模型接口设置由页面中的选项控制。
+
+不同部署使用各自的数据库，本地服务与网站之间不会自动同步数据。
+
+## 5. 使用工作台
+
+工作台可以读取项目、修改文件、运行命令和执行验证，需要先登录。
+
+**工作台操作的是运行 Yorozuya 后端的那台机器。** 在自己电脑上运行时可处理本机项目；访问远程网站时，不能直接操作你电脑上的目录。Docker 部署只能访问容器内可见的目录。
+
+1. 打开「工作台」，切换到「工作区」。
+2. 填写项目目录，点击「登记工作区」。登记会在项目中写入 `agent.config.json` 和 `AGENT.md`。
+3. 根据项目需要，在工作区配置中填写验证命令，例如已有测试项目可使用 `python -m pytest -q`。
+4. 返回委托页，选择工作区，写清任务目标，点击「开始委托」。
+5. 出现审批卡时，核对文件、命令和操作内容，再决定允许或拒绝。
+6. 完成后查看结果、文件差异和验证状态；需要时导出报告或使用回滚功能。
+
+第一次可以从「查看这个项目的结构，说明各目录的用途」这样的只读任务开始。
+
+未配置 API Key 时，工作台使用专用演示目录运行固定流程，不会处理你登记的真实项目。配好模型后才会由模型执行真实委托。没有配置验证命令时，结果也不能视为已经通过测试。
+
+## 6. 在 Windows 上运行
+
+### 准备环境
+
+安装 Python（建议使用与部署镜像一致的 3.12 版本）、Git，以及可连接的 MySQL 数据库。
+
+在 PowerShell 中执行：
+
+```powershell
+git clone https://github.com/Moonlight-blip-oss/Yorozuya.git
+cd Yorozuya
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-- ★ **`--distpath .`**：不写就会在 `dist/` 里生成，项目里会多一个目录（我们不再用 `dist/`）
-- ★ **不要加 `--clean`**：它会去删 `build/` 里的旧内容，在这台机器的沙箱里会被 safe-delete 拦下，导致构建中途以非零码退出（PYZ/PKG 都好了、只差写 EXE 那一步）
-- ★ **打包要用装了 PyInstaller 的那个解释器**：本机是
-  `C:\Users\ASUS\.workbuddy\binaries\python\envs\default\Scripts\python.exe`（`pack_exe.bat` 里写死的那个）。
-  PATH 上的 `python` 是裸解释器，一跑就是 `No module named PyInstaller`
-- ★ **改完前端不等于改完 exe**：exe 里的 `renderer/` 是打包那一刻的快照，必须重打包才会跟着变
+### 配置数据库
 
-### 方式二：源码运行（开发调试）
-
-```bash
-cd zhiban-py
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-
-# 桌面窗口
-.venv\Scripts\python.exe app\desktop.py
-
-# 仅起服务，浏览器访问 http://127.0.0.1:8902
-.venv\Scripts\python.exe app\server.py
-```
-
-> ⚠️ 用**项目 venv 的解释器**（`.venv\Scripts\python.exe`）。PATH 上的 `python` 是裸解释器，
-> 没有 fastapi/uvicorn/pywebview，一跑就闪退且看不到报错 —— 这也是「用户双击/敲 `python x.py` 必然失败」的根因。
-
-首次启动会**自动创建 `zhiban` 数据库和全部表**，无需手动建表：
-
-| 侧 | 表 |
-|----|----|
-| 陪伴 | `users` `sessions` `chats` `conversations` `memories` `todos` `user_settings` `user_stats` |
-| 工程 | `agent_runs` `agent_events` `agent_tool_calls` `agent_approvals` `agent_checkpoints` `agent_artifacts` `agent_memories` `agent_workspaces` `agent_settings` |
-
-## 部署到服务器（用浏览器访问，不用装 exe）
-
-★ **先搞清楚一件事：要部署的是「整个后端」，不是那个 HTML。**
-`renderer/index.html` 里所有请求都是相对路径（`fetch("/api/…")`），它必须由后端**同源**提供；
-后端 `GET /` 本来就会把 `index.html`（顺手把 `?v=__BUILD__` 换成真实构建号）和 `renderer/` 全部发出去。
-所以：**把后端跑起来 = 网页也就部署好了**，前端一行都不用改（也不需要 CORS）。
-
-### 方案 A：一台 Linux 服务器 + Docker Compose（推荐）
-
-仓库里已经带好一整套：`deploy/docker-compose.yml`（app + MySQL + Caddy 自动 HTTPS）、
-`deploy/Dockerfile`、`deploy/Caddyfile`、`requirements-server.txt`。
-
-```bash
-# 1) 服务器上装 docker + compose 插件，然后把代码放上去（见本文件「部署到服务器」详细步骤）
-# 2) 填配置
-cp deploy/.env.example deploy/.env      # 改 DOMAIN、两个数据库密码
-# 3) 域名 A 记录指向这台服务器；安全组/防火墙放行 80 与 443
-# 4) 起
-cd deploy && docker compose up -d --build
-# 5) 建你自己的账号（★ 默认关着注册，所以用命令建；用户名 2-20 位、密码 6-64 位）
-curl -s https://你的域名/api/auth/register -H 'Content-Type: application/json' \
-     -d '{"username":"yorozuya","password":"你的密码"}'
-#    注册默认是关的。要建号或临时开注册：在 deploy/.env 里加一行 ALLOW_REGISTER=1
-#    → docker compose up -d app → 注册 → 删掉那行（或改成 0）→ 再 up -d app
-#    （不用手改 compose；install.sh 会自动做「临时开 → 建号 → 立刻关回」）
-```
-
-- 数据落在两个具名卷：`db-data`（MySQL）、`app-data`（`appdata/` 上传附件与 agent 快照）
-- 数据与**你本机那份完全独立**（服务器是它自己的 MySQL），本机的聊天记录不会自动同步过去
-- 备份 = `docker compose exec db sh -c 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" zhiban' > zhiban.sql` ＋ 备份 `app-data` 卷
-- 数据库**没有**对外映射端口，只在 compose 内网里
-
-### ★ 国内服务器部署实录（2026-09-17 · 阿里云 2C2G / Alibaba Cloud Linux 3）
-
-一次真实部署踩到的三个点，**都已在仓库里修好**：
-
-| 现象 | 根因 | 处置 |
-|---|---|---|
-| 拉 `mysql:8.4` 报 `registry-1.docker.io … Client.Timeout`（caddy 却拉成功了） | 服务器自带阿里云加速器对 `mysql:8.4` **未命中缓存** → 回源 Docker Hub；而 Docker Hub 在国内直连不通 | `/etc/docker/daemon.json` 的 `registry-mirrors` **追加**（不是覆盖）`https://docker.m.daocloud.io` —— 实测返回 401（= 正常响应、源可用），重启 docker 后 813MB 镜像顺利拉下 |
-| 构建镜像**静默卡死**十几分钟，日志停在 `Get:4 …/Packages [9678 kB]`，mtime 一动不动 | `python:3.12-slim` 里的 `deb.debian.org` 在国内**连得上但下不动**（直接 curl 完全无响应） | `deploy/Dockerfile` 已把 apt 源换成 `mirrors.aliyun.com`（实测 597KB/s），pip 加 `-i https://mirrors.aliyun.com/pypi/simple/` |
-| `install.sh` 建号报 `{"error":"本服务器已关闭注册"}` | compose 里 `YOROZUYA_ALLOW_REGISTER` **写死 `"0"`**，而建号走的正是 `/api/auth/register` → 必然建不上；脚本只 warn 一句，很容易被当成"建好了" | compose 改为 `${ALLOW_REGISTER:-0}`（默认仍关）；`install.sh` 改成**临时开 → 建号 → 立刻关回**；收尾提示里的建号命令也修正了（原命令在关注册下必失败） |
-
-顺带两点，**不是问题、别去改**：
-
-- Alibaba Cloud Linux 3 是 RHEL 系（`dnf`，没有 `apt-get`），但 `install.sh` 只在**缺 curl** 时才调 apt —— curl 是预装的，所以这个不匹配不会触发。
-- 它检查 `ufw`，这台机器用的是 firewalld（当时未运行），同样安全跳过。
-
-实测结果（公网放行前，走本机回环验证）：
-
-```
-/api/agent/status          → 401（服务活着，只是没带 token）
-renderer/app.js 文案        → 数据保存在你的账号（云端 MySQL）
-app.js?v=                   → 2026-09-17.1120
-POST /api/auth/register     → 403（公网收紧生效）
-经 Caddy 访问 /             → 200
-数据库表                     → chats conversations memories sessions todos user_settings user_stats users（首次启动自动建好）
-```
-
-⚠️ **部署完还差最后一步：云控制台安全组放行 80/443**（入方向，来源 `0.0.0.0/0`）。
-没放行时服务在服务器内部一切正常（`curl 127.0.0.1` 200），但**公网访问不到** —— 别误判成部署失败。
-（2026-09-17 已放行：ECS 控制台 → 实例 → 安全组 → **管理规则** → 入方向 → **快速添加规则** → 勾 Web HTTP/HTTPS。）
-
-### ★ HTTPS 已上线（2026-09-17）
-
-域名 **`yorozuya.fun`**（阿里云注册）→ A 记录 `@` → `47.110.90.19`。
-改 `deploy/.env` 的 `DOMAIN` / `SITE_ADDRESS` / `PUBLIC_URL` 三行 → `docker compose up -d`，
-Caddy 自动完成 ACME HTTP-01 校验并签发证书（日志关键字 `certificate obtained successfully`）。
-
-```
-https://yorozuya.fun   → 200；证书 CN=yorozuya.fun · Let's Encrypt · 90 天（到期前自动续期）· TLSv1.3
-http://yorozuya.fun    → 308 Permanent Redirect → https://yorozuya.fun/
-```
-
-⚠️ **两个"看着像坏了其实没坏"**：
-
-- `curl -I https://yorozuya.fun` 返回 **404** 是正常的 —— 应用的路由只支持 GET，而 `-I` 发的是 HEAD。**要看 GET**。
-- 上了域名之后**用 IP 访问会失效**（Caddy 只服务 `SITE_ADDRESS` 这一个地址），这是预期行为。
-
-⚠️ **顺序不能反**：必须**先让域名解析生效**（`nslookup 你的域名` 能查出服务器 IP），**再**重启容器。
-反过来做的话，SITE_ADDRESS 已经变成域名、而 ACME 又解析不到本机，会**域名和 IP 两头都进不去**。
-（域名侧还有两个前置：NS 要指向注册商分配的 DNS 服务器、国内域名要**实名认证通过**，否则记录加了也不生效。）
-
-### ★ 这个部署现在是「展示站」（2026-09-17 定）
-
-站点公网可达（`http://47.110.90.19`），但**只做展示**、不承担实际使用：
-
-| 开关 | 值 | 效果 |
-|---|---|---|
-| `ALLOW_REGISTER` | 缺省 = `0` | 陌生人注册不进来（`POST /api/auth/register` → **403**） |
-| `ALLOW_GUEST` | **`1`** | 点「不登录，先逛逛」即可体验：**一个字节都不写库**；工作台对访客一律拒绝 |
-
-实测：
-```
-GET  /                        → 200（无门禁）
-POST /api/auth/guest          → 200，拿到 guest:… token
-POST /api/auth/register       → 403（已关闭）
-GET  /api/state（访客）        → 200（只能看自己）
-POST /api/agent/run（访客）    → 403 ← 关键：访客跑不了工作台
-```
-
-### ★ 曾经加过又撤掉的一层门禁（写在这里，需要时照着加回来）
-
-2026-09-17 上午曾给全站加过 **Basic Auth**（`basicauth`，凭据只存 bcrypt 哈希不落盘），
-同日下午因为站点改成纯展示而撤掉。**Caddyfile 里留了注释和写法**，随时能加回来。
-
-⚠️ **什么时候必须加回来**：把站点恢复成「能真正使用」的形态时 —— 也就是**开放注册**、
-或**允许登录用户使用工作台**。因为工作台是能在服务器上**真执行命令**的，而 IP 公网可达，
-没有门禁等于把服务器交出去。
-
-```bash
-# 加回来的步骤
-docker exec deploy-caddy-1 caddy hash-password --plaintext '你的密码'   # 生成哈希
-# 把 basicauth { 用户名 <哈希> } 写进 deploy/Caddyfile（v2.4~v2.7 用 basicauth；v2.8+ 改叫 basic_auth）
-docker exec deploy-caddy-1 caddy validate --config /etc/caddy/Caddyfile   # ★ 先验语法再重启
-cd deploy && docker compose restart caddy
-# 验证：无凭据 curl -I http://<地址>/ → 401；带 -u 用户:密码 → 200
-```
-
-> 这台机器的 Caddy 是 **v2.4.6**（老），所以指令名用 `basicauth`；升到 2.8+ 要改成 `basic_auth`。
-
-### 方案 B：不用 Docker（venv + systemd + Caddy/Nginx）
-
-```bash
-sudo apt install -y python3-venv mysql-server git
-sudo mkdir -p /srv/yorozuya && cd /srv/yorozuya     # 代码放这里
-python3 -m venv .venv && .venv/bin/pip install -r requirements-server.txt
-```
-
-`/etc/systemd/system/yorozuya.service`：
-
-```ini
-[Unit]
-Description=Yorozuya (FastAPI + MySQL)
-After=network.target mysql.service
-
-[Service]
-User=yorozuya
-WorkingDirectory=/srv/yorozuya
-Environment=ZHIBAN_DB_HOST=127.0.0.1
-Environment=ZHIBAN_DB_USER=yorozuya
-Environment=ZHIBAN_DB_PASS=换成你的库密码
-Environment=ZHIBAN_DB_NAME=zhiban
-Environment=YOROZUYA_CORS_ORIGINS=https://你的域名
-Environment=YOROZUYA_ALLOW_REGISTER=0
-Environment=YOROZUYA_ALLOW_GUEST=0
-Environment=YOROZUYA_DATA_DIR=/srv/yorozuya/appdata
-ExecStart=/srv/yorozuya/.venv/bin/uvicorn server:app --app-dir app --host 127.0.0.1 --port 8902 --proxy-headers
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-sudo systemctl enable --now yorozuya
-# 前面挂 Caddy/Nginx 做 TLS，反代到 127.0.0.1:8902（Caddyfile 就三行，见 deploy/Caddyfile）
-```
-
-### 方案 C：没有服务器，只想在外面/手机上用自己这台电脑
-
-保留本机 MySQL 与 agent 能力，用隧道把本地服务临时暴露成 HTTPS 域名：
-
-```bash
-cloudflared tunnel --url http://127.0.0.1:8902      # 或者 ngrok http 8902
-```
-
-先双击 `Yorozuya.exe` 把服务起起来，再开隧道，手机就能访问那个临时域名。
-**但一定要**设 `YOROZUYA_ALLOW_REGISTER=0` / `YOROZUYA_ALLOW_GUEST=0`（隧道 URL 是公开的），
-或者用 Cloudflare Access 加一层登录。
-
-### 部署前必须知道的三件事
-
-1. **工作台 = 能在那台机器上执行命令**。agent 的 `run_command` / 改文件都是真执行（有审批，但审批的是登录用户）。
-   所以：容器里用非 root（镜像已经这样）、**关掉公开注册与访客**、只给自己用。
-2. **API Key 是「每个用户自己的」**，存在 MySQL 的 `user_settings.api_key` 里，没有全局 Key ——
-   陌生人注册进来用的是他自己的 Key，不会烧你的额度；访客态则一律走本地演示语料，不调模型。
-3. **必须 HTTPS**：登录 token 存在浏览器 `localStorage` 里，明文 HTTP 传等于送人。
-
-### 相关开关（都是环境变量，默认保持本机行为）
-
-| 变量 | 默认 | 作用 |
-|---|---|---|
-| `ZHIBAN_DB_HOST` / `_PORT` / `_USER` / `_PASS` / `_NAME` | `127.0.0.1:3306 / root / 空 / zhiban` | 数据库连接（优先级高于 `db_config.json`） |
-| `YOROZUYA_CORS_ORIGINS` | `*` | 允许的跨域来源，逗号分隔。放公网时写成自己的域名 |
-| `YOROZUYA_ALLOW_REGISTER` | `1` | 设 `0` → `POST /api/auth/register` 返回 403 |
-| `YOROZUYA_ALLOW_GUEST` | `1` | 设 `0` → `POST /api/auth/guest` 返回 403 |
-| `YOROZUYA_DATA_DIR` | `<项目根>/appdata` | 上传附件 / agent 快照的落点（容器里指向挂载卷） |
-
-> 服务器上**不要**直接 `pip install -r requirements.txt`：里面的 `pywebview` / `pyinstaller` 是桌面壳与打包用的，
-> 无图形界面的 Linux 装 pywebview 会去拉 GTK/WebKit 一堆依赖。用 `requirements-server.txt`。
-
-## 应用图标
-
-五套设计，用 `--style` 切换（默认 `photo`）：
-
-### `photo` · 手绘原图（现用）
-
-直接采用手绘的定春圆形徽章原图（`icon/source_sadaharu.jpg`，1920×1920）：
-居中**圆形裁切**（半径 = 边长 × 0.494，完整保留毛边墨线）+ 边缘 4.5px **羽化**，
-让徽章浮在任何底色上都干净。实现在 `tools/render_photo.py`，全套尺寸从一张 1024 母版缩放。
-
-
-### `sadaharu` · 定春圆形徽章（现用）
-
-概念：**一枚有手绘感的圆形徽章，定春的头几乎撑满整个圆**。远看是和纸质感的徽章，近看能读出"定春 + 万事屋"。
-
-| 层 | 元素 |
-|----|------|
-| 底色 | **浅米黄 → 淡茶色**径向渐变（边缘再压深一层）+ **640 根和纸纤维**（短弧线 / 反光纤维 / 纸屑），另加一层极淡的内缘晕影当徽章厚度 |
-| 底纹 | 身后一个**半透明淡墨大字「银」**（华文行楷，1.1 倍画幅、`-8°` 倾斜、不透明度 46），大半被定春挡住，只在四周留下隐约墨触 |
-| 左下 | **洞爷湖木刀**斜插进来：浅木色刀身 + 刀背高光 + 刀刃暗线，柄缠四道深褐绳 + 一节**刀镡**，再往右就钻进定春身后 |
-| 右下 | **新八的圆眼镜**：细墨框 + 淡蓝镜片反光（月牙 + 白色细高光）+ 一截镜腿 |
-| 右上 | **神乐的紫伞**：五瓣油纸伞面（带伞骨、受光面、波浪下沿）+ 伞尖 + 竹伞杆；伞面落在头顶与右耳之间的空档，伞杆斜穿到徽章边缘被裁掉——像从外面斜插进来 |
-| 中心 | **定春头部**（详见下） |
-| 领口 | 鲜红项圈 → 黄铜铃（**横竖刻纹** + 高光 + 铃口弧 + 顶环）→ 菱形小木牌（**华文行楷**写「万事屋」，每字随机位移、±7° 旋转做"潦草"感） |
-| 外圈 | **手绘墨线边框**：400 段弧片拼接，每段宽度与浓淡由平滑噪声驱动（枯笔浓淡），随机开 7 处**磨损缺口**，内侧再叠一层更细的**飞白**，圈外撒 18 点溅墨 |
-
-**定春头部**（对齐参考图的关键特征）：
-
-| 特征 | 实现 |
-|------|------|
-| 蓬松白毛 | 32 瓣**柔和弧线轮廓**（顶部/两侧蓬、下巴平缓）；瓣的相位与抖动都是确定性的，墨线与内缩填充才能严丝合缝 |
-| 睁开的眼睛 | 大圆瞳（`EYE_BG`）+ 下半**青灰渐变反光**（两层递减 alpha）+ 左上大白高光 + 右下小高光 + 一圈淡墨描边 |
-| **招牌眉毛** | 淡褐色**弯月**（`_crescent`：二次贝塞尔的上下两条弧围成，两端自然收尖），拱起、外端低、内端下勾——与眼睛之间留出一道白缝，不然会看成眼睑 |
-| 耳朵 | 参数化耳形（基部宽、往尖端收成三角），尖端外弯 + 微垂；耳内浅粉只占中间一块；**耳尖各翘起一撮绒毛**（墨线 + 白芯） |
-| 呆毛 | 头顶一撮**斜甩的卷毛**：只从那道轮廓"出去"一次，末端甩在空中离轮廓很远——两端都贴轮廓就会看成提环（踩过两次坑） |
-| 鼻子 / 嘴 | 圆钝粉色倒三角（`_smooth` 倒角）+ 微张的嘴、两颗小牙、一小截粉舌（带高光） |
-
-手绘描边的做法：**先用较宽的墨线沿轮廓走一圈，再用内缩一圈的浅色填充盖上去**，只留墨线外半边 → 宽度均匀、边缘略有起伏的扁平贴纸描边。耳与头的接缝也用同一招：头部填充天然擦掉了耳线伸进头内的部分，耳朵填充又擦掉了穿过耳朵的头部墨线。
-
-### 三档细节
-
-| 档位 | 尺寸 | 处理 |
-|------|------|------|
-| `full` | ≥64px | 全套（纤维、淡墨「银」、木刀、眼镜、紫伞、铜铃刻纹、木牌字、飞白与溅墨） |
-| `simple` | 24-48px | 去掉纤维与底纹，保留木刀 / 眼镜 / 紫伞 / 铜铃 / 木牌字，毛瓣更大更少 |
-| `micro` | ≤16px | 只留"圆底 + 白狗头 + 粉耳 + 红项圈 + 墨圈"的剪影 |
-
-### `sign` · 万事屋木牌 + 定春
-
-定春趴在门口那块旧木牌上打盹，深夜墨蓝底 + 右下角灯笼暖橘光晕。
-
-### `badge` · 圆形徽章（木刀与委托单）
-
-深墨蓝→夜黑圆形徽章 + 银白发光描边 + 斜放木刀压泛黄委托单 + 齿轮闪电气泡 + 弧缎带写 YOROZUYA。
-
-### `lantern` · 提灯
-
-夜里亮着的纸灯笼 + 墨色「屋」+ 挂绳穗子，暖褐底。
-
-### 三档细节
-
-| 档位 | 尺寸 | 处理 |
-|------|------|------|
-| `full` | ≥64px | 全套（纤维、淡墨「银」、木刀、眼镜、铜铃刻纹、木牌字、飞白与溅墨） |
-| `simple` | 24-48px | 去掉纤维与底纹，保留木刀 / 眼镜 / 铜铃 / 木牌字，毛瓣少一些 |
-| `micro` | ≤16px | 只留"圆底 + 白狗头 + 粉耳 + 红项圈 + 墨圈"的剪影 |
-
-### 产物与生成
-
-| 文件 | 用途 |
-|------|------|
-| `icon/Yorozuya_1024.png` | 母版 |
-| `icon/Yorozuya_{512,128}.png` | 预览 / 文档 |
-| `icon/Yorozuya.ico` | 16/24/32/48/64/128/256 七尺寸，供 exe 与桌面窗口 |
-| `renderer/favicon.ico` | 浏览器标签页 |
-| `renderer/logo.png` | 界面侧栏与登录页的 Logo |
-
-```bash
-python tools/make_icon.py                    # 默认 sadaharu（定春圆形徽章）
-python tools/make_icon.py --style sign       # 木牌定春
-python tools/make_icon.py --style badge      # 圆形徽章（木刀委托单）
-python tools/make_icon.py --style lantern    # 提灯
-```
-
-绘制代码按风格拆模块：`tools/make_icon.py`（入口 + sign / badge / lantern）、`tools/render_badge_dog.py`（定春圆形徽章，配色与构图参数集中在文件顶部，底纹的 `IK_SIZE / IK_CY / IK_ALPHA / IK_ROT` 可直接调）。
-
-## 开场动画（每次开机随机一位成员登场）
-
-Yorozuya 启动时会先播一个品牌开场动画（`app/desktop.py` 里的 `SPLASH_HTML`，纯 HTML/CSS/JS，无外部资源）：
-
-- **随机登场**：每次开机从四位成员里**随机抽一位**（`splash_html(port, pid=None)`，传了合法 `pid` 就按指定的来）
-- **配色取同一位的主题**：底色 / 面板 / 墨色 / 点缀色 / 头像全来自那一张主题表，不会出现"小玉的头像配银时的底色"这种错配
-- **头像 base64 内联**：启动画面不能依赖还没起来的本地服务；取不到就退回"中文首字徽章"，绝不让启动画面开天窗
-- 文案跟着这位成员走：`「<名字> 正在开门，请稍候…」` → 就绪后 `「<名字> 已经开门，欢迎回来」`
-
-时间轴单点定义在 `app/desktop.py` 顶部的 `HERO_*`（改时长要连着这里一起改）：
-
-| 时间 | 动作 |
-|------|------|
-| 0.12s | **墨圈描边**：SVG 双环用 `stroke-dasharray/dashoffset` 一笔画出 |
-| 0.30s | **头像牌弹出**：从 0.8 倍、-7° 弹到正位（`cubic-bezier(.16,1.42,.42,1)` 回弹） |
-| 0.70s | 名牌（这位成员的名字）淡入 |
-| 1.00s / 1.18s | 标题、副标题依次上浮 |
-| 1.15s | **光泽扫过**：一道斜向高光掠过头像牌 |
-| 1.30s | 头像开始**呼吸**（无限循环，直到进场） |
-| 1.35s | 右侧百分比出现 |
-| 全程 | 进度条渐进逼近 92%（`v += (92-v)*0.006`，**永远不自己走满**） |
-| 就绪 | Python 调 `window.__setReady()` → 进度补满 100% + 文案变「已经开门，欢迎回来」→ 整页淡出 → 再 `load_url` 切到应用页 |
-
-细节：
-- 收尾时刻 **2.20s**，与 `MIN_SPLASH = 2.5` 秒之间留 0.3s 静止余韵
-- 服务常常 1 秒就绪，没有这个下限动画会一闪而过；服务慢时也不会额外等待
-- 动画只影响观感，不阻塞启动流程；9 秒后仍出现「重新连接」按钮（见排错章节）
-- 进度条用 `requestAnimationFrame` 驱动，靠 `done` 标志让位给"就绪"状态
-- 验收：`build/verify/verify_splash.py`（时间轴数值）、`verify_splash_ui.js`（真实 Edge 逐帧）、`shots_splash_one.js`（四个人格各截一张）
-
-## 无控制台（console=False）适配
-
-打包成窗口程序后**没有 stdout/stderr**（`sys.stdout is None`），而 uvicorn 初始化日志时会调用
-`sys.stdout.isatty()`，直接 `AttributeError` 崩溃——这也是"从命令行启动正常、双击就崩"的根因。
-
-`app/desktop.py` 在**导入时**（早于 import uvicorn / server）调用 `install_std_streams()`：
-`sys.stdout / sys.stderr` 为 None 时换成 `_LogStream`（一个 `io.TextIOBase` 子类），
-`isatty()` 返回 False，写入内容直接落进 `yorozuya-start.log`，并补一个空的 `sys.stdin`。
-`encoding` / `errors` 是 `TextIOBase` 的**只读属性**，必须用 `@property` 覆盖，
-在 `__init__` 里赋值会抛 `AttributeError`（会让整个模块导入失败）。
-
-## 排错：exe 卡在启动页 / 打不开
-
-### ⚠️ 如果窗口标题栏变灰、显示「未响应」
-
-那是 **GUI 线程被卡住**，和业务代码无关，`yorozuya-start.log` 里也**不会有**任何报错 —— 别去 log 里找。
-
-已知成因只有一类：**`js_api` 对象上挂了「不可调用的公开属性」**。
-pywebview 生成 JS 桥时会反射 `js_api` 的公开属性，非可调用但带 `__module__` 的会**递归展开**
-（`webview/util.py` 的 `get_functions`）。`Window` 实例正好满足条件，于是桥会去 `dir(Window)`
-摸到 `native`（.NET/WinForms 后端），而这段是在 `window._expose_lock` 里跑的
-→ 桥永远注入不完 → 页面拿不到 `window.pywebview` → **窗口未响应（每次必然复现）**。
-
-所以 `app/desktop.py` 里有一条硬规矩：
-
-```python
-_WINDOW = None            # 窗口句柄只放**模块级变量**（模块全局不会被反射）
-class AppApi:
-    def __init__(self):
-        self._on_retry = None     # 私有属性用下划线开头（桥会跳过）
-    def retry(self): ...
-    def pick_folder(self): ...    # 公开方法可以
-# ❌ 绝不要写：api.window = win / self.window = xxx
-```
-
-守这条规矩的验收：`build/verify/verify_desktop_api.py`（23 项）—— 它复刻桥的反射规则，
-断言「暴露的函数正好是 retry / pick_folder」「没有任何公开的非可调用属性被展开」，
-并用**从 pywebview 源码里原样取出的真实实现**做对照验证复刻是忠实的（含一个坏样本自证检查有效）。
-有桌面会话的机器上还能跑真实启动验收：`build/verify/verify_desktop_boot.py`
-（等 `window.events.loaded`，带硬超时看门狗；本机起不了 GUI 时它会如实报 SKIP）。
-
-### 其它启动问题
-
-1. **看启动日志**：`appdata/yorozuya-start.log`（打包版和源码版共用同一份），每一步都有记录
-   （依赖导入 → 服务端口就绪 → load_url 是否成功 → 页面自检结果）。把最后一屏发给我就行。
-2. 启动页 **9 秒后会出现「重新连接」按钮**，点它即可重试，不用关掉重开。
-3. 45 秒仍连不上会自动切到错误页，并用默认浏览器打开 `http://127.0.0.1:端口`。
-4. 常见原因：MySQL/MariaDB 没启动；`db_config.json` 不在项目根（见上「数据放在哪」）；8902/8904-8906 被占用。
-
-### 数据放在哪（★ 只有一份）
-
-不管用 exe 还是源码启动，**落盘数据都在 `<项目根>/appdata/`** 这一处（唯一事实来源：`yorozuya/paths.py`）：
-
-```
-appdata/
-  webview-data/       WebView2 用户档案（登录状态就存在这儿，别随手删）
-  zhiban-data/
-    agent/            agent 内核数据：blobs（快照）/ artifacts（大输出）/ trash（回收站）/ bg / demo-workspace
-    uploads/          对话附件（按用户分目录隔离）
-    tmp/              验收脚本的脚手架
-  last_persona.json   上次使用的人格（启动画面抽签用）
-  yorozuya-start.log  启动日志（打包版没有控制台，全靠它留痕）
-```
-
-- 从前打包版把数据写在 `dist/`、源码版写在项目根 → 同一份东西出现两份（登录状态还会"搬家"）。现在统一了
-- 想把数据放到别的盘/别的机器：设环境变量 `YOROZUYA_DATA_DIR`（优先级最高）
-- 启动日志的第一行会打印**当前实际用的数据根**，排查"数据跑哪去了"看它就行
-
-## MySQL 配置
-
-复制示例配置并填入你的 MySQL 账号密码（服务启动时读取）：
-
-```bash
-copy db_config.example.json db_config.json
-```
+在项目根目录新建 UTF-8 编码的 `db_config.json`，填写自己的数据库连接信息：
 
 ```json
 {
   "host": "127.0.0.1",
   "port": 3306,
-  "user": "root",
-  "password": "你的MySQL密码",
+  "user": "yorozuya",
+  "password": "替换为你的数据库密码",
   "database": "zhiban"
 }
 ```
 
-也可以用环境变量覆盖：`ZHIBAN_DB_HOST` / `ZHIBAN_DB_PORT` / `ZHIBAN_DB_USER` / `ZHIBAN_DB_PASS` / `ZHIBAN_DB_NAME`。
+数据库账号必须已经存在，并具有创建应用数据库和表所需的权限。程序会在启动时初始化数据库结构。
 
-> 若 MySQL 不可用，服务仍会启动，但注册/登录会提示"数据库连接失败"。
+也可以通过环境变量 `ZHIBAN_DB_HOST`、`ZHIBAN_DB_PORT`、`ZHIBAN_DB_USER`、`ZHIBAN_DB_PASS` 和 `ZHIBAN_DB_NAME` 配置连接；环境变量优先于配置文件。
 
-## 账号系统
+`db_config.json` 已被 Git 忽略，不应上传到仓库。
 
-- **注册/登录**：首次打开进入登录门，可切换注册；用户名 2-20 位（中文/字母/数字/下划线），密码 ≥6 位
-- **访客模式**：登录门上的「不登录，先逛逛」按钮可领取临时访客身份（`/api/auth/guest`，token 形如 `guest:<随机串>`）
-- **密码安全**：PBKDF2-HMAC-SHA256（200,000 次迭代 + 随机盐），数据库中不存明文
-- **会话**：Bearer Token 存 `sessions` 表，有效期 30 天；退出登录即失效
-- **数据隔离**：对话、记忆、待办、设置、成长统计全部挂在 `user_id` 下，账号之间互不可见；换设备登录同一账号数据自动跟随
+### 启动
 
-### 访客模式（免登录 · 无记忆）
+桌面窗口：
 
-| 能力 | 登录账号 | 访客 |
-|------|---------|------|
-| 对话（含演示模式 / 自填 Key） | ✅ | ✅ |
-| 待办与提醒 | ✅ | ✅（仅当前会话） |
-| 长期记忆（自动提取 + 手动添加） | ✅ | ❌ |
-| 数据落库（MySQL） | ✅ | ❌ 一个字节都不写 |
-| 导入备份 / 修改密码 | ✅ | ❌ |
-
-实现要点：`app/server.py` 里的 `_GuestGuardDB` 代理所有数据库写操作，遇到 `guest:` 前缀的 user_id 直接静默跳过；访客状态只存在进程内存（`MAX_GUESTS=200`，超限淘汰最早的），系统提示词会注入「访客模式」说明，让银时不会承诺"我记住了"。
-
-> 注意：访客数据存在**服务端内存**中，重启服务或关闭页面即清空；换端口/换设备也是全新的访客。想留住记忆就注册账号。
-
-## 架构
-
-```
-app/desktop.py ──► uvicorn 线程 + pywebview 窗口
-app/db.py      ──► MySQL 数据层（连接管理/建库建表/轻量迁移/PBKDF2 密码/Token 会话/按用户读写）
-app/server.py  ──► FastAPI 核心（全部业务逻辑）
-  ├─ /api/auth/register|login|logout|me|password   注册/登录/登出/改密码
-  ├─ /api/auth/guest  领取访客通行证（免注册，不落库、无记忆）
-  ├─ /api/chat        SSE 流式对话：人格+记忆+待办+亲密度注入；支持 tool calls 与 thinking
-  ├─ /api/memories    记忆 CRUD；每轮对话后台异步提取新记忆（JSON 约束输出+去重）
-  ├─ /api/todos       待办 CRUD；/api/reminders 轮询触发到期提醒
-  ├─ /api/settings    模型接口配置 / 人格切换（银时·神乐·新八）/ 对用户的称呼 / 记忆开关
-  ├─ /api/state       统一视图：chats+memories+todos+growth（XP/等级/亲密度/徽章）+ newBadges
-  ├─ /api/badges      125 枚里程碑清单（含分组/达成状态/稀有度/达成条件）
-  ├─ /api/badges/preview  演示接口：回放成就弹窗（不写库；只能回放**已解锁**的那些）
-  ├─ /api/files       对话附件：上传落盘 + 抽正文（不收 multipart，少一个依赖）
-  └─ /api/export|import|reset   数据管理
-yorozuya/  ──► 陪伴侧模块（app/server.py 的零件；需要 DB 的子模块由 server 注入 DB）
-  ├─ personas.py      4 位成员的唯一数据源（设定 / 口癖 / 风格铁律 / 私交 / few-shot 示例）
-  │                   + WORLD_CAST：27 位同世界观人物的共享事实源（关系只写一遍）
-  ├─ achievements.py  125 枚里程碑（7 组）；判据是 fn(state)，新增一位成员不必改判据
-  ├─ views.py         state_view / settings_view —— 后端 → 前端**唯一**的出口
-  ├─ files.py         对话附件的落盘与正文抽取
-  └─ common.py        时间 / ID / 星期 + BUILD_STAMP（「客户端版本」那一行）
-yorozuya/agent/ ──► ★ 工程内核（M0/M1/M2/M3）：不 import server/db，可独立测试
-  ├─ kernel.py        Agent Loop + 三道闸门（权限 / 预算 / ★ 验证）
-  ├─ tools/           **31 个工具**（读 5 / 写 3 / 文件管理 4 / Git 4 / 执行 1 / 后台进程 4
-  │                   / 联网 2（`web_fetch` `web_search`）/ **天气 4** / 工程记忆 2 / 计划 1 /
-  │                   子代理 1；MCP 按工作区配置另加 2；详见「工具清单」一节）
-  ├─ subagent.py      M3：只读子代理（explore / plan），独立上下文，只回 <1k 字摘要
-  ├─ mcp_client.py    M3：MCP stdio 客户端（JSON-RPC 2.0：initialize → tools/list → tools/call）
-  ├─ context.py       分层上下文 + 预算闸门；M3 起压缩走「模型化摘要」（失败退回截断）
-  ├─ demo.py          演示模式：没配 Key 时内核按固定脚本真跑一遍（只在演示工作区）
-  ├─ classifier.py    任务分级（本地规则，零 token）
-  ├─ router.py        人格任务分流三态：keep / deflect / auto_switch
-  ├─ permissions.py   allow/ask/deny + 4 档信任 + 路径 jail + 命令黑名单
-  ├─ snapshot.py      内容寻址快照 + undo（逐字节回滚）
-  ├─ storage.py       agent_* 表（运行/事件/工具/审批/快照/产物/工程记忆/设置）
-  └─ gitinfo.py       工作区只读 git 概览（工作台「工作区」页用）
-app/server.py 里的工程接口（陪伴路径一行不改）：
-  /api/agent/status|workspaces|run|runs|runs/{id}/events|pending|diff|undo|report|stop|approval|stats|prices|handoff
-renderer/   ──► 纯静态展示层（零依赖，只调 API；自适应布局；思考过程折叠 + 工具标签）
-  └─ agent.js ──► 工作台：五种工作卡片 + 断线续传（?after=seq）+ 运行回放 + 成本仪表
-                  外壳只建一次，在「左侧工作台页面」与「右侧抽屉」之间按需挂载
+```powershell
+.\.venv\Scripts\python.exe app\desktop.py
 ```
 
-## 里程碑（成就）系统 · 125 枚
+或只启动服务，然后在浏览器中打开 `http://127.0.0.1:8902`：
 
-共 **125 枚**徽章，分 **7 组**、4 个稀有度（普通 42 / 稀有 52 / 史诗 20 / 传说 11）：
-
-| 分组 | 数量 | 代表徽章 |
-|------|:---:|------|
-| 💬 交流 | 18 | 👋初次见面 · 💬打开话匣 · 🥛草莓牛奶(20) · 🍡三色丸子(50) · 🍨巧克力芭菲(100) · 📖万事屋常客(200) |
-| 🧠 记忆 | 17 | 🌱第一印象 · 🧠记住你了(5) · 📚共同记忆(20) · 🏛️记忆宫殿(50) · 📌重要的事 · 🗂️重点标记 |
-| 🌙 陪伴 | 16 | 🌤️明天见 · 📆一周之约 · 🌙相伴一月 · 💯百日之约 · 🎂一年之约 · 🕯️三日不断 |
-| ✅ 业务 | 15 | 📝委托受理 · ✅靠谱万事屋(10) · 🏆万事屋主(50) · ⏰时间管理大师 · 🎯说到做到 · 🧹清空柜台 |
-| ⚔️ 亲密度 | 12 | ✨有点熟了(Lv.3) · ⚔️武士之魂(Lv.5) · 🗡️洞爷湖(Lv.10) · 🛡️万事屋的守护(Lv.15) · 🌟灵魂同频(Lv.20) · 🤝心照不宣 |
-| 🎭 彩蛋 | 22 | 🌃深夜的第一句 · 👺夜半委托 · 🐔早起委托人 · 🍱午休偷懒 · ✍️长篇大论(200字) · 📜论文级委托(500字) |
-| 👥 角色 | 25 | 👋他刚睡醒 · 🌃陪他熬夜 · 🍓糖分补给 · 👻别拿鬼吓他 · 🌙深夜长谈 · 💸房租警告 |
-
-> **「角色」组**是**和每一位成员各自相关**的成就（25 枚，四人各一批）：陪他熬夜、糖分补给、别拿鬼吓他…
-> 判据里的角色维度是数据驱动的 —— 新增一位成员不需要改判据函数，`PERSONAS` 加一条即可。
-
-**解锁弹窗**：右下角 Steam 风格卡片——滑入 + 光泽扫过 + 稀有度配色光晕 + 音效（Web Audio 合成，无外部资源）+ 6 秒倒计时条，最多同屏 4 条，点击可提前关闭。传说级额外带脉冲金光和更长的展示时间。
-
-**实现要点**
-- 解锁状态持久化在 `stats.unlocked`（id → 解锁时间戳），因此每枚成就**只会弹一次**
-- `state_view(s, user_id)` 每次返回都会结算一次，新解锁的放进 `newBadges` 字段；前端在统一的 `api()` 包装里拦截该字段并弹窗，所以任何操作（聊天 / 记忆 / 待办 / 设置）触发解锁都能弹
-- 单次最多结算 4 枚（`MAX_POP_BADGES`），其余留到下次访问再弹，避免刷屏
-- 统计埋点：`stats.days`（按天计数）、`stats.hours`（小时分布）、`stats.longest`（单条最长）、`stats.todosCreated`（委托数）；其余条件直接基于内存中的 chats / memories / todos 实时计算
-- `POST /api/badges/preview`：**演示接口**，回放一次解锁弹窗，不写库、不改真实进度。**只能预览已解锁的里程碑**——一枚都没解锁时返回 400；指定未解锁的 id 返回 403（条件不该被提前泄露成动画）。成长页「🔔 预览解锁弹窗」按钮会按顺序轮播你已解锁的那些；点击已解锁徽章也可单枚回放，点未解锁的只提示达成条件
-- 成长页按 7 组分区展示，每区显示 `已解锁 / 总数`，未解锁的显示达成条件
-
-## 人格系统（四位成员，不可自定义）
-
-设置页只能从万事屋固定成员（银时／神乐／新八／小玉）里挑一位，性格文案由后端锁定（唯一数据源是 **`yorozuya/personas.py`**），API 收到 `personaName` / `personaPrompt` 一律忽略。唯一可自定义的是**对用户的称呼**（`userName`）。
-
-### 人格是怎么「立住」的
-
-每个人格由 **6 个部分**拼进系统提示词（`build_system_prompt`），而不是一句笼统的设定：
-
-| 字段 | 作用 |
-|------|------|
-| `prompt` | 人物设定（身份、外貌、处境、性格底色） |
-| `tics` | **口癖**——识别角色的关键，要求自然带出（银时：啊——/喂喂/我说你啊；神乐：阿鲁；新八：（推眼镜）/说到底；小玉：主人/……请交给我吧） |
-| `styleRules` | 风格铁律，含**硬性要求**（神乐每句必须带「阿鲁」；新八每次至少一句吐槽；小玉以「主人」相称）与**禁止项**（银时禁止鸡汤） |
-| `world` | **私交**——跟谁怎么称呼、什么立场、怕谁（和下面的共享事实源配套） |
-| `examples` | **few-shot 语感示例**（3 组问答）——锁语感最有效的手段 |
-| `temperature` | 银时 0.78 / 神乐 0.80 / 新八 0.72 / 小玉 0.74（统一收在 0.7~0.8，银时神乐更跳脱、新八小玉更稳） |
-
-提示词首尾各强调一次「你是 XX，不是通用助手」，末尾统一样式约束（口语化 1-3 句、不要 Markdown 标题列表、动作描写最多一处）。
-
-### ⚠️ 明暗主题的四条铁律（改配色前先读这段）
-
-主题的唯一出口是 `renderer/personaThemes.js`：角色色由后端 `THEMES` 下发、写成内联 CSS 变量；
-用户选「深色 / 浅色」时由 `FORCE_PALETTE` **再覆盖一层语义令牌**。四条都是实测踩出来的：
-
-1. **颜色一律走变量，不要写死**。写死 `#fff` 的底色在深色下不会变，配浅色字就是 2.07:1。
-   需要「色相 + 底/字」配对时用 `color-mix(in srgb, <色相> N%, var(--panel|--ink))` —— 一处规则同时满足明暗两套。
-2. **`background-image` 画在 `background-color` 之上**。只换 `--panel` 而不换 `--panel-grad`
-   等于没换：卡片 / 聊天输入框 / 头像 / 会话条目依旧是**浅色渐变**，亮字压上去就看不清了。
-   这也是「待办、记忆里的字全看不清」的真正根因。
-3. **「当底用」和「当字用」的角色色必须拆开**。角色色相（`--accent` / `--accent-deep`）故意不换、
-   以保留人格辨识度；但**当文字用**的那一档必须跟着明暗翻（`--accent-text`），
-   否则深色下就是「深灰压深底」（实测导航选中标签 3.1:1、人格面板 2.4:1）。
-4. **`--on-accent` 配的是浅档 accent**（新八是深藏青），拿它配 `--accent-deep` 会变成 2.9:1 ——
-   深档底统一用 `--on-accent-deep`。
-
-验收：`build/verify/verify_workbench_ui.js` 第 13b 段会在真实浏览器里**逐元素扫描**陪伴侧三类页面
-（聊天 / 记忆 / 待办）的明暗两套主题，断言「没有亮底亮字的元素」+「占位符也看得清」+
-「深色下没有残留的浅色卡片面」。量对比度的工具在 `build/verify/contrast_lib.js`，**渐变底会取最差色停**
-（只读 `background-color` 的检查会给出假通过）。
-
-#### 世界知识：一份共享事实源 `WORLD_CAST`
-
-四份提示词各写一遍「谁是谁」必然各说各话，所以世界观人物只在 `yorozuya/personas.py` 的
-**`WORLD_CAST`（27 人）** 里写一次（名字 → 身份 / 亲属 / 标志物），再用 `world_roster()` 压成
-一行注入**所有**人格。配套的 `WORLD_RULE` 明确要求：用户提到这些人要认得出来、
-**不要反问「那是谁」**、关系不能记错。
-
-> 这条是实测抓出来的：写 `build/verify/check_world_knowledge.py` 用真实模型问 19 个
-> 「一定认识但人物表里没写」的角色，模型其实认得 18/19，但**关系会说错** ——
-> 神乐把哥哥**神威**说成「弟弟」。修完 27/27、说错关系 0 条。
-
-⚠️ **共享表里不许出现任何角色的口癖**：它会注入全部 4 份提示词，
-写「神乐句尾爱说阿鲁」等于把神乐的口癖念给银时听，会诱导全员串台。
-`check_personas.py` 里有专门断言守着这条（遍历 4 人全部口癖做子串检查）。
-
-> 注意：这里修掉过一个真 bug——原来提示词最后一行硬编码了「符合**银时**的说话方式」，对神乐/新八是负向牵引。现在改为按人格动态生成。
-
-| id | 人格 | 口吻示例 |
-|----|------|------|
-| `gintoki` | 🥤 银时 | 「啊——被骂了？喂喂，你老板是啃了芥末寿司吗……行了，草莓牛奶在冰箱第二层，自己拿。」 |
-| `kagura` | 🌂 神乐 | 「哈？谁骂你！报名字，我这就去把他办公室的墙拆了阿鲁！」 |
-| `shinpachi` | 👓 新八 | 「（推眼镜）说到底，被骂不代表你做错了什么。……阿银今天还赖在榻榻米上啃仙贝呢，你至少比他清醒。」 |
-| `tama` | 🤖 小玉 | 「……（检索中）主人，被责备确实会让人难受。先喝口热茶吧，我这就去烧水。如果责任不在您，也不必把别人的火气都接过来。」 |
-
-演示模式（无 Key）同样按人格分发语料：`MOCK_LINES[人格]` 覆盖 累了/开心/难过/职场/在吗/记忆/你是谁/道谢/缺钱 等意图，包含同样的口癖与吐槽。
-
-人格影响：系统提示词、演示模式回复（每人一套独立的本地语料）、聊天页头像 emoji 与副标题、成长页名字。切换后立即生效，历史对话与记忆都保留。
-
-### 聊天里也能查天气 / 搜资料（不只是工作台）
-
-四位成员在**对话里**就能真的联网：问天气、查资料，不用切到工作台。说人话就行 ——
-「今天北京天气怎么样」「明天南昌适合户外运动吗」「帮我搜一下 Python 怎么读大文件」。
-
-| 想问什么 | 它会用的工具 |
-|---|---|
-| 现在 / 未来几天 | `weather_now` · `weather_forecast` |
-| 过去某几天 | `weather_history` |
-| 「这儿 8 月一般多少度」 | `weather_climate` |
-| 不知道去哪找的资料 | `web_search`（免 Key，走公开搜索结果页）→ 想读全文再 `web_fetch` |
-| 你直接给了网址 | `web_fetch` |
-
-两件刻意做的事：
-
-- **工具清单是自动生成的，不手写第二份。** 给模型看的清单由 `TOOL_SPECS` 渲染
-  （`app/server.py::_tool_catalog`）—— 手写的话，加了工具就会「spec 里有、提示词里没有」，
-  模型于是不知道自己能查天气，照样回「我查不到」。
-- **★★ 查不到就如实说，绝不许编。** 系统提示里写死：温度、降水、新闻、链接都必须以工具返回的
-  内容为准；工具没成功时**不许给出任何具体数字或结论**，更不许拿「常识」当地实况
-  （实测过：问一个不存在的城市，新八会说「查不到，给我个真实地名」而不是编一个温度）。
-  工具报错本身也是人话（「连不上天气服务（…）本机网络或代理不通时就是这样」），
-  模型照着讲就能让你知道是哪一步没走通。
-
-**关掉工具会怎样**：设置里的「工具」开关一关，提示词会换成「你现在查不了，请如实说明」——
-而不是照旧吹自己会查。
-
-**切换人格不会重置工具**：`toolsEnabled` 是账号级设置，前端切人格只提交 `personaId` 一个字段
-（`apply_persona` 也只碰人格字段），所以换人之后工具照旧可用。验收里有一条专门盯这个。
-
-**无 Key 的演示模式也能查**：演示模式本来就有「思考 → 调工具 → 回答」的链路；现在这条链路
-也能调联网工具，会**真去查**，并把结果原样贴出来，明确标注「下面这段是真查到的，不是我编的」。
-
-**切换人格只换"声音"，不会把历史问题再答一遍**：回灌给模型的历史里，凡是「她连着的几句话
-被并成一段」的（切人格后最容易出现 —— 新人格几乎没有自己的回复），都会显式标上
-`（以下是早前说过的话…）`，系统提示里也写明**这一轮只回最后一条**。不这么做的话，模型会把
-那一段历史读成"这里有好几个问题，挨个答" —— 实测就是这样把四十分钟前问过的事又答了一遍。
-
-**历史消息头像不会跟着变**：每条 AI 回复在生成时就把当时的人格 id 写进消息（落库字段 `chats.persona`，内存里是 `msg["pid"]`），渲染时按消息自身的人格取头像与名字（悬停头像可看是谁说的）。所以切换人格后翻回去看旧对话，还是当时那个人的头像，只有新消息才是新人格。人格系统上线前的历史回复在迁移时统一补登记为 `gintoki`（那会儿只有银时）。
-
-**记忆上次选择**：所选人格（`user_settings.persona_id`）与对用户的称呼都会落库，**退出登录 / 重启服务后再登录，还是上次那位成员**。
-
-**专属开场白**：每位成员第一次登场都会留一句话（每人格 3 句随机取 1，存在 `PERSONAS[*]["greeting"]`）。
-
-- 触发时机：① 新账号／访客首次进入（对话为空时）；② 从设置页切到某位此前没登场过的成员
-- 开场白就是一条普通 AI 消息，带 `greet: true` 标记（气泡下方显示「开场白」小标签）与当时的 `pid`，因此**头像同样不会变**
-- 每个人格只打招呼一次（记录在 `stats.greeted`，随 stats JSON 落库），不会每次切换都刷一句
-- 对话为空时，页面还会显示该人格的专属空状态文案（`PERSONAS[*]["empty"]`）
-
-**账号状态**（设置页卡片）：登录账号 / 账号状态（正常 · 访客临时）/ 注册时间 / 相伴天数 / 当前等级（含 Lv.x/20）/ 对话条数 / 长期记忆数 / 待办统计 / 里程碑进度 / 数据存储说明（MySQL 位置 + 密码为 PBKDF2 加盐哈希）。
-
-### 设置页自适应布局
-
-设置页用 CSS Grid 自动适配窗口尺寸，无需手动调整：
-
-| 窗口宽度 | 布局 |
-|---------|------|
-| ≥ 1500px | 三列栅格（性格卡与操作栏仍占满整行），整页居中限宽 1440px |
-| 1024–1500px | 两列（`auto-fit minmax(330px, 1fr)`） |
-| ≤ 860px | 单列；性格卡内「称呼 + 记忆开关」由并排改为堆叠 |
-| ≤ 700px | 侧栏收成纯图标（64px），操作按钮整行撑满，账号状态项改为上下排列，成就弹窗自适应宽度 |
-| 高度 ≤ 640px | 头部与卡片留白自动收紧 |
-
-留白统一用 `clamp()` 做流体缩放；底部「保存设置」操作栏 sticky 吸底，滚动时始终可见。
-
-## 工具调用（Tool Calls）与思考过程
-
-让模型**真的把事情办掉**，而不是嘴上说「我记住了」。
-
-**9 个内置工具**（`app/server.py` 的 `TOOL_SPECS` / `TOOL_IMPLS`）：
-
-| 工具 | 作用 |
-|------|------|
-| `add_memory` / `list_memories` / `forget_memory` | 记忆的写入 / 检索 / 删除 |
-| `add_todo` / `list_todos` / `complete_todo` / `delete_todo` | 待办增删查改（`add_todo` 支持 `due_iso` 自动设提醒） |
-| `get_current_time` | 查当前时间（换算「明天」「下周」时先调它） |
-| `set_user_name` | 记住用户希望你如何称呼 TA |
-
-**流式协议**（`/api/chat` 的 SSE 事件类型）：
-
-```
-{"think": "..."}   推理模型的思考增量（reasoning_content / reasoning 字段）
-{"delta": "..."}   正文增量
-{"tool": {...}}    一次工具调用已执行：{name, label, ok}
-{"notice": "..."}  提示（如「该模型不支持工具调用，已自动降级」）
-{"done": true, reply, think, tools}
+```powershell
+.\.venv\Scripts\python.exe app\server.py
 ```
 
-**执行循环**：调用模型（带 `tools`）→ 流式收集 `content` / `reasoning_content` / `tool_calls`（**工具名与参数都按 index 拼接分片**）→ 有调用则在服务端执行、把结果作为 `role: tool` 回灌 → 最多 `MAX_TOOL_ROUNDS = 3` 轮、每轮最多 `MAX_CALLS_PER_ROUND = 4` 个调用 → 输出最终回复。
+首次进入后注册账号、登录，再配置模型接口。如果你已取得打包好的 `Yorozuya.exe`，可在准备好数据库配置后双击运行；源码仓库不包含 exe。
 
-**健壮性**
-- 模型不支持 function calling 时（返回 400/422 且提到 tool/function），**自动关掉 tools 重试一次**并给前端 `notice`
-- 访客调用 `add_memory` 会被拒绝，并把「访客模式不能保存记忆，不要说我记住了」作为工具结果回灌给模型
-- 插件/工具报错不会中断对话，错误文本会回灌让模型自己解释
-- 已经调用过工具的这一轮就不再跑记忆提取（避免重复写）
-- 演示模式（无 API Key）也走「思考 → 调工具 → 回答」链路：`_mock_intent()` 做轻量意图识别，所以不配 Key 也能看到完整效果
+不要直接双击 `renderer/index.html`，页面需要由后端服务提供。
 
-**持久化**：思考过程与工具记录随消息存进 `chats.meta`（JSON），回看历史时仍可展开，也用于前端渲染「🧠 记住了：…」这类标签。
+## 7. 在自己的服务器上部署
 
-**设置开关**：`toolsEnabled`（允许调用工具）、`showThink`（显示思考过程，默认开），两者都落库。
+仓库提供 Docker Compose 配置，包含应用、MySQL 和用于 HTTPS 的 Caddy。GitHub 仅托管源码，上传仓库不会自动启动网站；本项目也不能作为纯静态页面部署到 GitHub Pages。
 
-### ★★ 工具开关的三条纪律（改这块之前先读，删任何一条都会复发）
+工作台具备文件修改和命令执行能力，部署应面向你自己或受信任的用户。公网服务应使用 HTTPS、额外的访问控制，并保持公开注册关闭。
 
-真实事故（2026-09-16）：她在设置里关掉工具、后来又打开，**AI 从此一直说「我查不了」**，
-连问三轮回不来。原因是「历史赢了提示词」，另外还牵出一个更严重的编造问题。三条缺一即复发：
+### 准备与配置
 
-1. **提示词必须声明「当前状态」**：开着时明写「历史里那句『我查不了』只是**当时**设置所限，
-   与这一轮无关，该查就得查」。只写"关着时该怎么说"是不够的 —— **存量历史只能靠这一条救**。
-2. **关闭期的回复要留痕**：`chats.meta.toolsOff` + `history_for_persona()` 的 `TOOLS_OFF_MARK` 前缀
-   （「这句只在当时成立」），防新产生的污染。
-3. **关着时由服务端直接照实回**（`_tools_off_reply`）：命中"本来该用工具做的事"就**不进模型**。
-   ★ 这条是硬保证 —— 提示词写到「一个数字都不许出现」，它照样编出「拉萨 13 度」「银川 23 度，湿度 47%」；
-   改成服务端短路后，回复里一个数字都不会有。四个角色**语气不同、事实逐字一致**。
+在已安装 Git、Docker 和 Docker Compose 的 Linux 服务器上执行：
 
-界面侧的验收：`build/verify/verify_tools_toggle_ui.js`（含「刷新页面后设置仍在」）；
-后端侧：`build/verify/verify_tools_toggle.py`（演示模式跑，零 token）。
-另注：`showThink` 只影响**显示**；模型不吐 `reasoning_content` 时（如 `deepseek-chat`），
-开了也看不到思考 —— 想要思考过程请用推理模型（`deepseek-reasoner` 实测可用，且带 tools 正常）。
-
-## 工作台（工程委托 · M2 界面 / M3 能力 / 待办直通 / 验证命令）
-
-工作台**有两个入口，同一份东西**：
-
-| 入口 | 形态 | 什么时候用 |
-|------|------|-----------|
-| 左侧导航 **「工作台」** | **整页**（全宽、限宽居中） | 认真干活：看完整卡片流、读 diff、翻运行记录、对成本 |
-| 对话页右上角 **「🛠 工作台」** | **右侧抽屉**（不切走当前页） | 随手拉出来看一眼 / 边聊边盯进度 |
-
-两者不是两套界面：外壳（头部 + 五个分区 + 卡片流）**只建一次**，在页面与抽屉之间**搬来搬去** ——
-所以跑到一半从页面收进抽屉，卡片一张不少；全站也只有一个 `#wbStream`，不存在重复 id 那种坑。
-
-| 分区 | 内容 |
-|------|------|
-| **委托** | 写一句要它做什么 → 实时看五种卡片长出来（**常用委托模板**一键填入、最近用过的目标、跑完回对话开关） |
-| **待办** | 待办与工程委托**连起来**：在工作台里就能看待办、加待办、把某条**派给小玉**（见下） |
-| **运行记录** | 历史运行列表（状态/步数/token/耗时/验证结论），可**搜索 / 按状态筛选**，点一下**回放**、**再跑一次**，或**删除**（单条 / 清空当前这批） |
-| **工作区** | 登记项目目录（写 `agent.config.json` / `AGENT.md`）、**看/改/自动探测验证命令**、看 git 状态、**用它跑委托**、移除 |
-| **成本** | 次数/完成率/步数/工具/token/审批/拒绝/回滚/验证未通过，以及按单价折算的金额 |
-
-### 待办直通：在工作台里把待办交给小玉
-
-「陪伴」那面的待办里常写着要动手的事（「修一下 calc.py 的边界判断」）。以前只能自己把这句话
-复制到委托框里。现在：
-
-1. 工作台 → **待办** → 点某条的 **「交给小玉做」**；
-2. 自动切到**委托**页、把这条待办的目标填进输入框，并出现一条**「来自待办：xxx」**提示
-   （这一步是显式的、可取消的 —— 不取消就代表「这次是替它干活」）；
-3. 点「开始委托」开跑；跑完**只有验证通过（`done`）才自动勾掉这条待办**，并弹一句回执；
-4. 跑完的结论会作为**一条消息**回到当前对话（发出者是本次运行的人格，消息上有个
-   **「🛠 工作台结论」**小标，点一下跳去工作台回放整次运行）。
-
-几个刻意的取舍：
-
-- **只在 `done` 时自动勾。** `done` 的含义是「内核自己跑过验证命令并且通过了」（或这次没动文件）；
-  `unverified` 是「工作区没配验证命令，我证明不了」→ 那时**提示你、不替你下结论**。
-  这是本项目的验证闸门口径，不因为「想让它自动」就放宽。其余状态（未通过/出错/被停/触顶）一律保持未完成。
-- **结论由服务端落库，不靠前端**。收尾动作挂在**内核线程结束时**，不在 SSE 生成器的 `finally` 里 ——
-  客户端断线时生成器会被关掉，那一刻内核其实还在跑，在 `finally` 里收尾会读到一个还没结束的状态。
-- **前端在流关闭后再问一次结果**（`GET /api/agent/runs/{id}/effects`）：`run.end` 是收尾**之前**
-  推出去的，不能拿它当结论；流关闭 ⇒ 服务端生成器走完 ⇒ 收尾一定已完成。
-- **「几个待办」不需要额外记状态**：关联关系落在 `agent_runs.todo_id`（老库用幂等 `ALTER` 补列，
-  见 `storage.MIGRATIONS`），所以刷新、回放、换台机器都还对得上。
-
-### 验证命令：工作台干的活「怎么才算被证明」
-
-内核的规矩是：**改完必须自己跑命令证明没坏**，光说「我改好了」不算。所以每个工作区要能给出
-「拿什么证明」—— 这就是 `agent.config.json` 里的 `verify_cmds`（一行一条，全部退出码 0 才算过）。
-
-**没配验证命令的后果不是"验证失败"，而是"根本没得验"**：内核没有命令可跑，那次运行只能标
-`unverified`，待办也不会自动勾掉（看上去像「工作台干的活没法验证」，其实是没得验）。
-
-所以工作区卡片上现在直接把这件事摆在明面上，并且**可以就地解决**：
-
-| 按钮 | 干什么 |
-|------|--------|
-| 卡片上的 **验证命令** 区 | 有就列出来；没有就红字写明「没有验证命令 → 内核没法自己证明改动是好的，跑完只能标「未验证」」 |
-| **改验证命令** | 就地在卡片里编辑（一行一条），保存即生效 |
-| **自动探测** | 按项目特征给一条**能真跑**的命令（见下） |
-
-自动探测认这些特征，**认不出来就返回空 —— 不瞎猜**（猜错会让每次运行都「验证未通过」，比留空更糟）：
-
-| 看到什么 | 给什么命令 |
-|---|---|
-| `package.json` 有真的 `scripts.test` | `npm test`（`echo "Error: no test specified" && exit 1` 这类默认占位**不算**） |
-| `pom.xml` / `build.gradle` / `gradlew.bat` | `mvn -q test` / `gradle test` / `gradlew.bat test` |
-| `Cargo.toml` / `go.mod` | `cargo test` / `go test ./...` |
-| `pytest.ini` / `pyproject.toml` / `tests/test_*.py` | `<当前解释器> -m pytest -q`（解释器取运行时自己那个，打包后也对） |
-| `tsconfig.json` / `Makefile` 有 `test:` 目标 | `npx tsc --noEmit` / `make test` |
-
-登记工作区时会自动探一次（探到就直接配上并在返回里告诉你）；运行结束后如果发现「这次没得验」，
-结果卡上会给一个 **「给它配一条验证命令」** 按钮，点一下直接跳到那条工作区并把编辑框打开。
-
-### 跑完的「本次结果」卡
-
-跑完的第一件事不是"状态是多少"，而是三个问题：**动了什么 / 有没有被证明 / 花了多少**。
-以前这三样要分别去翻 diff 卡、看自检卡、看结论卡；现在合并成一张卡：
-
-```
-本次结果   [完成]  工作区名
-改动了 2 个文件   calc.py  tests/test_calc.py        +12 -3
-[验证通过]  <python> -m pytest -q
-步数 7 · 工具调用 7 · token 1.1k · 耗时 1.06s · 花费 —
-[给它配一条验证命令]  [看 diff]  [导出报告]  [回滚这次改动]
+```bash
+git clone https://github.com/Moonlight-blip-oss/Yorozuya.git
+cd Yorozuya
+cp deploy/.env.example deploy/.env
 ```
 
-⚠️ **「没得验」与「验了没通过」是两件事**，卡上分开说：前者提示去配验证命令，后者标红并说明
-「这不是『大概好了』，是真的没证明没坏」。
+编辑 `deploy/.env`，替换下列值：
 
-### 卡片流降噪
-
-排查类任务会连出十几张工具卡，把「计划 / 审批 / 自检 / 结果」全刷下去 —— 真正要看的反而找不到。
-所以**工具卡默认折叠成一行**（工具名 + 风险 + 裁决 + 参数摘要），点 ▸ 展开看参数与完整结果；
-**失败/被拒的工具卡自动展开**（那是要你处理的东西，藏起来等于没提示）。
-
-### 常用委托模板
-
-委托框上面有四个 chips（看项目 / 跑测试并修好 / 找出坏掉的地方先列清单 / 收集 TODO）。
-第一条刻意是**只读任务** —— 不需要任何审批，想先看看 agent 靠不靠谱时最省事。
-点一下整句填进委托框，可以改也可以直接开始。
-
-⚠️ **「自动批准」开关刻意不沿用上次**（超时时间、跑完回对话这些沿用无所谓）：它是「关掉审批闸门」，
-静默继承等于下次无声地跳过所有确认。勾上时会立刻出现一条醒目警示。
-
-### 运行记录可以删了
-
-原来跑过的东西只能看，删不掉 —— 列表越堆越长，里面还混着当时试错的废跑。现在：
-
-- 每条记录上有 **「删除」**：二次确认里**说清删掉什么**（这条记录 + 它在项目里的留档文件夹 + 这次生成的大输出产物）
-- 筛选栏右侧有 **「清空这些」**：删的是**当前列出的这一批**（所见即所删 —— 前端把 id 数组发过去，
-  服务端不重新算筛选条件，不会因为期间又跑了一次而多删）
-- **快照 blob 不删**：它是内容寻址的、可能被别的运行共用，留着也正是「回滚依然安全」的原因
-- 删完会**重新拉一次成本仪表与角标**（否则数字停在旧值，看着像没删掉）
-
-### 任务留档：每个跑完的任务在项目里有一个文件夹
-
-跑完之后，工作台会在**工作区里**给它包一个文件夹（`.yorozuya/runs/<时间>-<runId>/`）：
-
-```
-.yorozuya/                     ← 整个目录可以随时删掉，不影响项目
-├── README.md                  ← 这目录是什么、能不能删、git 里怎么忽略
-└── runs/20260916-143214-f529acbf0907/
-    ├── README.md              ← 【先看这个】目标 / 结果 / 改了哪些文件 / 验证结论
-    ├── REPORT.md              ← 完整报告：每一步调了什么、参数、裁决、结果
-    ├── REPORT.json            ← 机器可读全量（事件流 + 审批），便于事后审计
-    ├── changes.patch          ← 改动前 → 现在的统一 diff（从快照 blob 取"改动前"，是真 diff）
-    ├── verify.log             ← 验证命令、原始输出与结论
-    └── files.txt              ← 改动清单（新建 / 修改 / 移走）
+```dotenv
+SITE_ADDRESS=你的域名
+PUBLIC_URL=https://你的域名
+MYSQL_ROOT_PASSWORD=替换为独立的强密码
+MYSQL_PASSWORD=替换为另一个独立的强密码
+ALLOW_REGISTER=0
+ALLOW_GUEST=0
 ```
 
-几个刻意的设计：
+将域名解析到服务器，并在安全组和防火墙中放行 80、443 端口。
 
-- **写在内核线程真正结束时**（不是运行过程中）：既不会被算进「这次改动的文件」，也不污染验证闸门；
-  快照与事件都已落库，patch 与报告才是完整的。
-- **`.yorozuya` 在受保护目录里**：agent 看得到但**改不了、删不掉**自己的历史（路径 jail 直接拒）。
-- **幂等**：同一次运行重复写只覆盖，不会再建第二个文件夹；路径记在 `agent_runs.task_dir`，
-  删记录时据此**精确**清理（而不是"按 runId 猜路径"）。
-- **清理一律"移入回收站"**，不做真删除 —— 与项目里其它删除同一个约定，随时能捞回来。
-- 结论回到对话时也会写一行「留档：`.yorozuya/runs/...`」，结果卡上同样标注（否则文件在项目里她也不知道）。
+### 启动与创建账号
 
-### 工具清单（31 个）
+```bash
+cd deploy
+docker compose up -d --build
+docker compose ps
+```
 
-| 组 | 工具 | 风险 |
-|---|---|---|
-| 读 | `read_file` `list_dir` `glob` `grep` `read_many` | read（眼熟档起免审） |
-| 写 | `write_file` `edit_file` `apply_patch` | write（永远 ask） |
-| 文件管理 | `copy_path` `move_path` `delete_path` `make_dir` | write |
-| Git | `git_status` `git_diff` `git_log` | read |
-| Git | `git_commit` | write（**必须点明提交哪些文件**，永不 push） |
-| 执行 | `run_command` | exec |
-| 后台 | `run_background` `bg_output` `bg_stop` `bg_list` | exec / read / exec / read |
-| 联网 | `web_fetch` `web_search` | exec（出网要审批；`web_search` **免 Key**） |
-| 天气 | `weather_now` `weather_forecast` `weather_history` `weather_climate` | exec（出网要审批；**不需要 API Key**） |
-| 记忆 | `memory_read` `memory_write` | read / write |
-| 计划 | `todo_write` | read |
-| 子代理 | `spawn_subagent` | read（只读子代理） |
-| MCP | `mcp_list_tools` `mcp_call` | read / exec |
+首次创建账号时，在已设置访问控制的服务上，将 `.env` 中的 `ALLOW_REGISTER` 临时改为 `1`，执行：
 
-几个新增工具的边界（都写进了工具描述，免得模型乱试）：
+```bash
+docker compose up -d app
+```
 
-- `apply_patch`：一次多处精确替换，**要么全成、要么一个都不动**（先把所有片段校验一遍再落盘）——
-  比连调 4 次 `edit_file` 稳：不会出现"改了一半"。
-- `delete_path`：**移入回收站**（可捞回），不做真删除。
-- `git_commit`：必须给 `files` 列表或显式 `all=true`（**不会替你 `git add -A` 一把梭**）；
-  照常跑项目的 pre-commit 钩子（不绕过质量闸门）；**永不 push**（命令黑名单里挡着）。
-- `web_fetch`：只支持 http/https、只做 GET、不执行 JS、不搜索；HTML 会剥掉脚本样式压成文本。
-- `run_background`：同时最多 2 个，输出写文件（进程活着也能读、不会被管道阻塞），
-  ★ **这次运行结束时内核一定把它们全收掉**（Windows 用 `taskkill /T` 连子进程），不留孤儿进程。
-- `weather_*`：数据源是 **Open-Meteo**（免费、**不需要 API Key** —— 要 Key 的工具等于要先让她
-  去注册账号，多数人走到第二步就放弃了）。预报最长 16 天、历史最早 1940 年、
-  一次最多查 366 天逐日；**不做**分钟级降水、空气质量、气象预警（那是别的数据源，不假装能做）。
-  和 `web_fetch` 一样是 `exec`：请求出网，而且**地名本身就是位置信息**。
-  历史数据来自 ERA5 **再分析**（模式回算），会与当地气象站实测有出入 —— 输出里写明了这一点。
+等待应用就绪后，通过网站的「注册」页面创建自己的账号。随后立即将 `ALLOW_REGISTER` 改回 `0`，再次执行同一条命令。关闭注册后，已有账号仍可登录。
 
-### 查天气 / 气候
+如需提供访客演示，可将 `ALLOW_GUEST` 设为 `1` 并重新创建应用容器；访客不能执行工作台任务。
 
-工作台里直接说人话就行：「北京现在多少度」「上海未来三天会下雨吗」「长春去年 8 月一般多热」。
+### 日常维护
 
-| 想问什么 | 用的工具 |
-|---|---|
-| 现在 | `weather_now`（气温 / 体感 / 天气现象 / 湿度 / 风 / 气压 / 今天的高低温与日出日落） |
-| 未来 | `weather_forecast`（逐日 1–16 天：高低温、天气、降水量与概率、风力、紫外线） |
-| 过去某几天 | `weather_history`（逐日 + 区间平均与极值；一次最多 366 天） |
-| 常年气候 | `weather_climate`（按月聚合过去 N 年：平均高低温、月降水、历史极端及出现日期） |
+在 `deploy` 目录中查看日志：
 
-几处刻意做的事（都是踩过才加的）：
+```bash
+docker compose logs --tail=100 app
+docker compose logs --tail=100 caddy
+```
 
-- **地名解析不会闷头给一个坐标。**「长春」在这个地名库里前 10 条**全是同名小村**（黑龙江、
-  陕西、福建…），真正的省会在库里叫「**长春市**」。所以：先按「有没有人口 / 行政级别」排序
-  （真城市优先于小村），再退到「加个市字」的写法，最后把**同名候选一并列出来**（「同名 / 相近的
-  还有：… 如果不是这个，把地名写更具体」）。不这么做的话，天气数字看着完全正常、一个报错都没有，
-  但地方是错的 —— 这正是最难发现的那种错。
-- **「吉林 长春」「吉林省长春市」这种写法也认。** 地名接口近乎精确匹配，直接查是 0 条 ——
-  而"省 + 市"恰恰是人最自然的写法。会剥掉省/市再试，并且**退让了就说出来**
-  （「你说的「吉林 长春」是按「长春」查的」）。
-- **历史的最近几天单独取。** 存档接口有约 7 天延迟，只查它会让「最近两周」**静默少掉最后几天**；
-  所以近段走另一个接口，两段拼起来。
-- **常年气候只算过完的年份**（当年还没过完，掺进来会把常年值拉偏），并且写明这一点。
-- **同一地点连问不重复出网**（几分钟内走缓存），问「现在怎么样、明天呢、周末呢」不会打三次。
+更新源码后重新构建：
 
-### 运行状态角标
+```bash
+git pull
+docker compose up -d --build
+```
 
-委托跑起来之后，把页面切走也知道进度：侧栏「工作台」上的角标 **●**（脉冲）= 有委托在跑，
-变成**数字** = 有几次已经跑完还没看；工作台「委托」页签上也有个小圆点。
+数据库与附件等数据保存在 `db-data`、`app-data` 卷中。升级前请备份数据库与数据卷；不要使用 `docker compose down -v`，该命令会删除部署的数据卷。
 
-### 委托表单的「操作条」是 sticky 的
+## 8. 常见问题
 
-`.wb-form-ops`（开始委托 / 停止）钉在面板底部。原因是**表单比面板高的时候主操作会被挤到折叠线以下**：
-加了「最近用过」那行之后，700×600 下按钮落到 y=610 而面板只到 582 —— 元素在页面上、数字都正常，
-就是 `elementFromPoint` 命中不到（点不了）。sticky 之后填表过程中始终可见。
-⚠️ 必须给底色（否则内容从底下透上来），且底色**要分挂载方式**：抽屉挂 `--panel`，整页挂 `--bg`。
-⚠️ 顺序也不能把操作条挪到开关前面 —— 「自动批准」有风险含义，必须先看到再决定按不按开始。
-界面验收里有一条专门守这个（§11「矮窗口下「开始委托」仍在面板内可点」）。
+| 问题 | 处理方法 |
+| --- | --- |
+| 提示「注册已关闭」 | 当前服务不接受新注册；联系管理员，或在自己的部署中临时开放注册并建号 |
+| 回复像固定台词 | 检查是否处于访客模式，以及登录账号是否已保存有效的模型配置 |
+| 模型请求报错 | 核对 API 基础地址、密钥、模型 ID、服务商额度以及后端到接口的网络连接 |
+| 工作台提示需要登录 | 退出访客模式，使用正式账号登录 |
+| 找不到工作区目录 | 确认路径存在于运行后端的机器上；Docker 中还需确保目录已挂载到容器 |
+| 启动失败或数据库连接失败 | 检查 MySQL 是否运行、地址端口是否可达，以及账号密码和权限是否正确 |
+| 打开 HTML 后按钮没反应 | 启动后端，通过本地服务地址或网站域名访问 |
+| 更新后仍显示旧界面 | 重启应用并强制刷新浏览器；打包版需要更新 exe，修改源码不会更新已有 exe |
+| 网站打不开 | 自建服务先检查容器日志、域名解析、安全组和防火墙的 80/443 端口 |
 
-> 另记一笔（**没改**，因为只在小窗口发生）：成就解锁弹窗 `#achvStack` 在 ≤700px 时宽度是
-> `calc(100vw - 28px)` 且贴底，会临时压住操作条。桌面壳窗口有最小宽度，正常用碰不到；
-> 界面验收里量布局前会把它临时隐藏（见 `verify_workbench_ui.js` §11 的注释）。
-
-### 五种工作卡片
-
-| 卡片 | 出现时机 |
-|------|---------|
-| **计划卡** | 模型调用 `todo_write` → 清单随进度勾选（计划真的会回灌进后续上下文，不只是贴纸） |
-| **工具卡** | 每次工具调用：工具名 + 风险等级 + 参数 + 裁决 + 结果 + 耗时 |
-| **命令输出卡** | `run_command` 的流式输出，超长自动折叠 |
-| **审批卡** | 要动文件/跑命令时**就地**出现：风险 + 参数 + 理由 + 倒计时 + 允许这次／本会话允许该工具／拒绝（伙伴档还能允许命令前缀） |
-| **diff 卡** | 改完立刻给 `+/-` 行级差异，默认折叠 |
-
-外加两张：**内核自检卡**（内核自己跑验证命令的真实结果，不采信模型自称）与
-**结论卡**（状态/步数/token/耗时 + 看 diff／导出报告／回滚改动）。
-
-### 断线续传与回放（M2 的技术要点）
-
-内核把每条事件**先落库再推流**，带单调 `seq`。所以：
-
-- **续传**：流断了、页面刷新了，前端用 `?after=<seq>` 把缺口补齐，并问一次
-  `/pending` 把「正卡在审批上」的卡片找回来 —— 运行本身在服务端照常跑，不用重来；
-- **回放**：已结束的运行点开即按事件顺序重演一遍（历史审批按钮禁用，不会误点）。
-
-### 上下文工程、子代理与 MCP（M3）
-
-长任务跑久了上下文会越滚越大，所以内核有三件配套的事：
-
-- **上下文：默认不限制**（2026-09-16 按她要求改）。原先 `MAX_CHARS = 60000`，超了就压缩
-  （只留最近 8 步原文 + 早期摘要），到 1.6 倍还会以「上下文过大」直接停掉运行 —— 压缩会丢步。
-  现在 **`max_chars = 0` 表示不限**：不压缩、不因此停止；聊天侧 `history_for_persona` 也不再只留
-  最近 30 条（`limit=0` 同样是不限）。压缩能力**没有拆掉**，想收紧就在工作区的
-  `agent.config.json` 里写 `"budget": {"max_chars": 60000}`（显式给了就按给的来）。
-  ⚠️ 真撞到模型自身的上下文窗口时，会以 API 报错的形式暴露 —— 那时内核会给一句能看懂的提示
-  （指出是上下文超了、以及怎么收紧），而不是把原始报错甩出来。
-  ⚠️ 实现上有个坑：`b.get("max_chars") or MAX_CHARS` 会把 `0` 吃掉（`0 or X == X`），
-  所以取值必须写成 `if b.get("max_chars") is not None`；不传 budget 时还要**以工作区自己的配置为底**，
-  否则工作区里配的预算会被无声忽略。
-- **子代理**：`spawn_subagent`（explore / plan）带**独立上下文**去"读几十个文件"，
-  只回一份 **≤1000 字**摘要给主内核。它是**只读**的（只有 `read_file`/`list_dir`/`glob`/`grep`），
-  写操作永远回主内核走审批。
-- **MCP**：自己实现的 stdio 客户端（JSON-RPC 2.0：`initialize` → `tools/list` → `tools/call`），
-  让内核能用生态里的外部工具。MCP 服务器由**工作区声明**：
-
-  ```json
-  {
-    "name": "my-project",
-    "verify_cmds": ["python -m pytest -q"],
-    "mcp": { "filesystem": { "command": "npx",
-                             "args": ["-y", "@modelcontextprotocol/server-filesystem", "."] } }
-  }
-  ```
-
-  没声明就一个 `mcp_*` 工具都不注册（不让模型看见调不通的工具）；
-  声明了就一定会调得通（服务端把这个配置传进内核，验收里有双向断言守着）。
-  `mcp_call` 风险等级是 **exec**，**必须审批**；工作台「工作区」页会显示声明的服务器名（`env` 不下发）。
-
-> M3 的设计、验收数据与已知边界见上面「工作台」一节。
-
-### 演示模式（没配 API Key 也能看全流程）
-
-没配 Key 时，工作台**不会**只给你一句「没配 Key」：内核会按固定脚本在
-`appdata/zhiban-data/agent/demo-workspace/` 里真跑一遍（修掉 `calc.py` 的 bug → 跑测试 → 变绿）。
-诚实边界同时写在界面与事件流里：**动作是内核按脚本发起的，不是模型想的**，
-而且**绝不碰你登记的真实项目**（入口处强制跳转）。配上 Key 之后，同样的卡片流由真实模型驱动。
-
-> 工程委托**需要登录**：运行记录与快照要落库，访客态一律明确拒绝（而不是悄悄什么都不发生）。
-> 设计、验收数据与已知边界见上面「工作台」一节。
-
-### 排错：界面还是旧的 / 点侧栏「工作台」出来的是抽屉
-
-这类现象**不是功能坏了，是你打开的那一份前端是旧的**。三种来源，按顺序排查：
-
-1. **看你打开的是哪个端口**：`8902` 是打包好的 exe（快照，可能比源码旧）；源码服务要自己起
-   （`.venv\Scripts\python.exe -m uvicorn server:app --host 127.0.0.1 --port 8914`）。**换过前端代码后必须重启源码服务**
-   （构建号是进程启动时导入的）。
-2. **刷新页面**：页面加载时是旧 JS 就一直是旧的（`Ctrl+F5` 强制重取）。
-   本项目静态资源已带 `Cache-Control: no-store` + `?v=<构建号>` 双保险，但**已经在内存里的旧页面不会自己更新**。
-3. **工作台头部有构建号**（`前端 <应用构建号> · 内核 <内核构建号>`）：如果这行不显示、或显示的是旧号，
-   说明你跑的就是旧界面 —— 这也是判断「要不要重打包」最快的办法。
-   （设置 → 账号状态里的「客户端版本」是同一个号。）
-
-另外：换了前端**不等于**换了 exe。exe 里的 `renderer/` 是打包那一刻的快照，必须重打包才会跟着变 ——
-一键脚本：**双击 `build\verify\pack_exe.bat`**（旧包自动让位成 `Yorozuya.prev.exe`、不加 `--clean`、
-打完自动**拆包校验**内嵌前端是否与磁盘逐字节一致 + 两个构建号是否对得上）。
-
-### 两个一键脚本（省得记命令）
-
-| 脚本 | 干什么 |
-|------|--------|
-| `build\verify\run_workbench_e2e.bat` | **浏览器验收**：8914 没服务就自己用源码 + 测试库起一个，先打印「这个服务是哪一版」自检（含旧后端 404 检测），再跑真实 Edge 的 E2E。产物在 `build\shots-workbench\` |
-| `build\verify\pack_exe.bat` | **重新打包 exe**：按项目配方打包 + 拆包校验（内嵌前端逐字节比对、后端关键词、构建号） |
-
-自检单独跑也行（不启浏览器、不打包）：`powershell -NoProfile -ExecutionPolicy Bypass -File build\verify\probe_server.ps1 8914`
-—— 它会告诉你「侧栏工作台页面入口有没有」「新接口是不是 404（旧后端）」「构建号是多少」。
-
-> 这三个脚本的提示语故意用英文：cmd/PowerShell 5.1 在没有 BOM 时按 ANSI 读脚本，中文会直接把脚本解析坏。
-
-## 等级与 XP、成长算法
-
-- **等级上限 Lv.20**（`MAX_LEVEL = 20`）
-- **XP** = 用户消息 ×10 + AI 回复 ×5 + 记忆数 ×20 + 相伴天数 ×5
-- **等级阈值** = `60 × (Lv-1)²`：Lv.5 需 960 XP，Lv.10 需 4,860 XP，Lv.15 需 11,760 XP，**满级 Lv.20 需 21,660 XP**（约等于每天 20 句、连续聊两个月）
-- 6 个亲密度阶段在 1-20 级之间均匀铺开：初识(1-4) → 熟悉(5-7) → 信任(8-10) → 默契(11-14) → 知己(15-17) → 灵魂同频(18-20)
-- **记忆提取**：每轮对话后台静默调用一次低温模型，输出 JSON 数组，与现有记忆做包含性去重后入库（已调用过工具的那轮跳过）
-- **演示模式**：未配置 API Key 时，后端按当前人格本地生成回复（每人一套独立语料，同样走 SSE 流式）
-
-
-## 配置模型
-
-设置页填任意 OpenAI 兼容接口（`https://api.deepseek.com/v1`、本地 Ollama 等）+ Key + 模型名。留空 Key 则演示模式（按当前人格回复）。
-
-# 项目开发规范
-- 每次代码修改只保留最近两个版本的历史，更早的版本自动清除，不做长期归档。
-- 版本控制以“当前版本 + 上一版本”为限，旧版本可直接覆盖或删除。
-- 打包产物就放在**项目根**（`Yorozuya.exe` + `Yorozuya.prev.exe`），不再用 `dist/`；
-  重新打包用 `build\verify\pack_exe.bat`（内部是 `--distpath .`）。
-- **改动要留下文字记录**：写进**代码注释或本 README**（原来那份 CHANGELOG.md 已删）——
-  需求来源 → 改了什么（含根因）→ 怎么验证的。二进制只留两个版本，但**踩过的坑要留下来**，
-  下次再踩同一个坑，靠的是这份记录而不是记忆。
-- 验收脚本放 `build/verify/`，命名按用途分：`verify_*` / `check_*` 是**长期可复用的验收**（改完必须重跑）；
-  `add_*` / `make_*` 是一次性生成脚本；**临时调查用的探针用完就删** —— 结论要落进 README 或代码注释里，
-  别把探针本身当档案留着（分辨不清哪些还有用，比文件多更糟）。
+遇到无法解决的问题，可以在仓库提交 Issue，说明操作步骤、运行方式和错误信息。请先移除截图和日志中的密码、API Key 与登录令牌。
